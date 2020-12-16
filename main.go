@@ -33,6 +33,7 @@ type Point struct {
 
 type Runner struct {
 	facing Point
+	vx, vy float64
 	x, y   float64
 	speed  float64
 }
@@ -42,44 +43,68 @@ func (r *Runner) Move() {
 	isYPressed := false
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		r.facing.x = 1
+		r.vx = 1
 		isXPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		r.facing.x = -1
+		r.vx = -1
 		isXPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		r.facing.y = -1
+		r.vy = -1
 		isYPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		r.facing.y = 1
+		r.vy = 1
 		isYPressed = true
 	}
 	if !isXPressed {
-		r.facing.x = 0
+		r.vx = 0
 	}
 	if !isYPressed {
-		r.facing.y = 0
+		r.vy = 0
 	}
 	if !isXPressed && !isYPressed {
 		return
 	}
-	normalized := math.Sqrt(math.Pow(r.facing.x, 2) + math.Pow(r.facing.y, 2))
-	r.x += (r.facing.x * r.speed) / normalized
+	normalized := math.Sqrt(math.Pow(r.vx, 2) + math.Pow(r.vy, 2))
+	r.x += (r.vx * r.speed) / normalized
 	if r.x >= screenWidth-padding {
 		r.x = screenWidth - padding - 1
 	}
 	if r.x <= padding {
 		r.x = padding + 1
 	}
-	r.y += (r.facing.y * r.speed) / normalized
+	r.y += (r.vy * r.speed) / normalized
 	if r.y >= screenHeight-padding-10 {
 		r.y = screenHeight - padding - 11
 	}
 	if r.y <= padding {
 		r.y = padding + 1
 	}
+}
+
+func (r *Runner) Draw(screen *ebiten.Image, clock int) {
+	op := &ebiten.DrawImageOptions{}
+	if r.facing.x < 0 {
+		op.GeoM.Scale(-1, 1)
+		op.GeoM.Translate(frameWidth, 0)
+	}
+	op.GeoM.Translate(
+		r.x-frameWidth/2,
+		r.y-frameHeight/2,
+	)
+
+	i := clock % frameNum
+	sx, sy := frameOX+i*frameWidth, frameOY
+	screen.DrawImage(
+		runnerImage.SubImage(
+			image.Rect(sx, sy, sx+frameWidth, sy+frameHeight)).(*ebiten.Image),
+		op,
+	)
 }
 
 type Game struct {
@@ -100,22 +125,11 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(
-		g.runner.x-frameWidth/2,
-		g.runner.y-frameHeight/2,
-	)
-	i := (g.count / g.speed) % frameNum
-	sx, sy := frameOX+i*frameWidth, frameOY
-	screen.DrawImage(
-		runnerImage.SubImage(
-			image.Rect(sx, sy, sx+frameWidth, sy+frameHeight)).(*ebiten.Image),
-		op,
-	)
+	g.runner.Draw(screen, g.count/g.speed)
 }
 
-func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return outsideWidth / 2, outsideHeight / 2
+func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
+	return screenWidth, screenHeight
 }
 
 func (g *Game) init() {
@@ -135,6 +149,7 @@ func main() {
 		log.Fatal(err)
 	}
 	runnerImage = ebiten.NewImageFromImage(img)
+	ebiten.SetWindowResizable(true)
 	ebiten.SetWindowSize(screenWidth*2, screenHeight*2)
 	ebiten.SetWindowTitle("Hello, World!")
 	if err := ebiten.RunGame(&Game{speed: 5}); err != nil {
