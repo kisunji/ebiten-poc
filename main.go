@@ -27,14 +27,10 @@ var (
 	runnerImage *ebiten.Image
 )
 
-type Point struct {
-	x, y float64
-}
-
 type Runner struct {
-	facing Point
-	vx, vy float64
-	x, y   float64
+	fx, fy float64 // facing
+	vx, vy float64 // velocity
+	px, py float64 // position
 	speed  float64
 }
 
@@ -42,22 +38,22 @@ func (r *Runner) Move() {
 	isXPressed := false
 	isYPressed := false
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		r.facing.x = 1
+		r.fx = 1
 		r.vx = 1
 		isXPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		r.facing.x = -1
+		r.fx = -1
 		r.vx = -1
 		isXPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		r.facing.y = -1
+		r.fy = -1
 		r.vy = -1
 		isYPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		r.facing.y = 1
+		r.fy = 1
 		r.vy = 1
 		isYPressed = true
 	}
@@ -71,31 +67,31 @@ func (r *Runner) Move() {
 		return
 	}
 	normalized := math.Sqrt(math.Pow(r.vx, 2) + math.Pow(r.vy, 2))
-	r.x += (r.vx * r.speed) / normalized
-	if r.x >= screenWidth-padding {
-		r.x = screenWidth - padding - 1
+	r.px += (r.vx * r.speed) / normalized
+	if r.px >= screenWidth-padding {
+		r.px = screenWidth - padding - 1
 	}
-	if r.x <= padding {
-		r.x = padding + 1
+	if r.px <= padding {
+		r.px = padding + 1
 	}
-	r.y += (r.vy * r.speed) / normalized
-	if r.y >= screenHeight-padding-10 {
-		r.y = screenHeight - padding - 11
+	r.py += (r.vy * r.speed) / normalized
+	if r.py >= screenHeight-padding-10 {
+		r.py = screenHeight - padding - 11
 	}
-	if r.y <= padding {
-		r.y = padding + 1
+	if r.py <= padding {
+		r.py = padding + 1
 	}
 }
 
 func (r *Runner) Draw(screen *ebiten.Image, clock int) {
 	op := &ebiten.DrawImageOptions{}
-	if r.facing.x < 0 {
+	if r.fx < 0 {
 		op.GeoM.Scale(-1, 1)
 		op.GeoM.Translate(frameWidth, 0)
 	}
 	op.GeoM.Translate(
-		r.x-frameWidth/2,
-		r.y-frameHeight/2,
+		r.px-frameWidth/2,
+		r.py-frameHeight/2,
 	)
 
 	i := clock % frameNum
@@ -138,8 +134,8 @@ func (g *Game) init() {
 	}()
 	g.runner = Runner{
 		speed: 1,
-		x:     screenWidth / 2,
-		y:     screenHeight / 2,
+		px:    screenWidth / 2,
+		py:    screenHeight / 2,
 	}
 }
 
