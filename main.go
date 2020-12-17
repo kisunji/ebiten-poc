@@ -37,24 +37,22 @@ func (r *Runner) Move() {
 	isYPressed := false
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		r.fx = 1
-		r.vx = 1
 		isXPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		r.fx = -1
-		r.vx = -1
 		isXPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		r.fy = -1
-		r.vy = -1
 		isYPressed = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		r.fy = 1
-		r.vy = 1
 		isYPressed = true
 	}
+	r.vx = r.fx*r.speed
+	r.vy = r.fy*r.speed
 	if !isXPressed {
 		r.vx = 0
 	}
@@ -65,14 +63,14 @@ func (r *Runner) Move() {
 		return
 	}
 	normalized := math.Sqrt(math.Pow(r.vx, 2) + math.Pow(r.vy, 2))
-	r.px += (r.vx * r.speed) / normalized
+	r.px += r.vx / normalized
 	if r.px >= screenWidth-padding {
 		r.px = screenWidth - padding - 1
 	}
 	if r.px <= padding {
 		r.px = padding + 1
 	}
-	r.py += (r.vy * r.speed) / normalized
+	r.py += r.vy / normalized
 	if r.py >= screenHeight-padding-10 {
 		r.py = screenHeight - padding - 11
 	}
@@ -178,11 +176,11 @@ func (g *Game) init() {
 		px:    screenWidth / 2,
 		py:    screenHeight / 2,
 	}
-	g.ais = append(g.ais, newAI())
-	g.ais = append(g.ais, newAI())
-	g.ais = append(g.ais, newAI())
-	g.ais = append(g.ais, newAI())
-	g.ais = append(g.ais, newAI())
+	g.ais = append(g.ais, newAI(1))
+	g.ais = append(g.ais, newAI(1))
+	g.ais = append(g.ais, newAI(1))
+	g.ais = append(g.ais, newAI(1))
+	g.ais = append(g.ais, newAI(1))
 	for _, ai := range g.ais {
 		go Run(ai)
 	}
@@ -190,11 +188,11 @@ func (g *Game) init() {
 
 var AIId int
 
-func newAI() *AI {
+func newAI(speed float64) *AI {
 	AIId++
 	ai := &AI{
 		Runner: Runner{
-			speed: 1,
+			speed: speed,
 			px:    padding + float64(rand.Intn(screenWidth-padding*2)),
 			py:    padding + float64(rand.Intn(screenHeight-padding*2)),
 		},

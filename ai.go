@@ -46,7 +46,6 @@ func Run(ai *AI) {
 		}
 		if ai.moveCmd == nil {
 			t := rand.Intn(5000)
-			log.Printf("sleeping for %d", t)
 			time.Sleep(time.Duration(t) * time.Millisecond)
 			ai.moveCmd = &movement{
 				d: direction(rand.Intn(8)),
