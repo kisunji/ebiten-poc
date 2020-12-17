@@ -6,21 +6,19 @@ import (
 	_ "image/png"
 	"log"
 	"math"
+	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 )
 
 const (
-	screenWidth  = 320
-	screenHeight = 240
+	screenWidth  = 640
+	screenHeight = 480
 	padding      = 10
 
-	frameOX     = 0
-	frameOY     = 32
 	frameWidth  = 32
 	frameHeight = 32
-	frameNum    = 8
 )
 
 var (
@@ -143,6 +141,7 @@ type Game struct {
 	count  int
 	speed  int
 	runner Runner
+	ais    []*AI
 	inited bool
 }
 
@@ -152,12 +151,18 @@ func (g *Game) Update() error {
 	}
 	g.count++
 	g.runner.Move()
+	for _, ai := range g.ais {
+		ai.Move()
+	}
 
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	g.runner.Draw(screen, g.count/g.speed)
+	for _, ai := range g.ais {
+		ai.Draw(screen, g.count/g.speed)
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -173,6 +178,32 @@ func (g *Game) init() {
 		px:    screenWidth / 2,
 		py:    screenHeight / 2,
 	}
+	g.ais = append(g.ais, newAI())
+	g.ais = append(g.ais, newAI())
+	g.ais = append(g.ais, newAI())
+	g.ais = append(g.ais, newAI())
+	g.ais = append(g.ais, newAI())
+	for _, ai := range g.ais {
+		go Run(ai)
+	}
+}
+
+var AIId int
+
+func newAI() *AI {
+	AIId++
+	ai := &AI{
+		Runner: Runner{
+			speed: 1,
+			px:    padding + float64(rand.Intn(screenWidth-padding*2)),
+			py:    padding + float64(rand.Intn(screenHeight-padding*2)),
+		},
+		id:      AIId,
+		killSig: nil,
+		moveCmd: nil,
+		running: false,
+	}
+	return ai
 }
 
 func main() {
