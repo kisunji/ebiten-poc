@@ -17,6 +17,7 @@ func newAI(speed int) *AI {
 			px:          float64(padding + rand.Intn(screenWidth-padding*3)),
 			py:          float64(padding + rand.Intn(screenHeight-padding*3)),
 			clockOffset: rand.Intn(10),
+			sprite:      runnerWaitingFrame,
 		},
 		id:      AIId,
 		moveCmd: nil,
@@ -86,15 +87,17 @@ func (a *AI) Move() {
 	if a.moveCmd == nil {
 		a.vx = 0
 		a.vy = 0
+		a.sprite = runnerWaitingFrame
 		return
 	}
-
 	defer func() {
 		a.moveCmd.repeat--
 		if a.moveCmd.repeat <= 0 {
 			a.moveCmd = nil
 		}
 	}()
+
+	a.sprite = runnerWalkingFrame
 
 	a.fx = a.moveCmd.fx
 	a.vx = a.fx * a.speed
@@ -103,9 +106,6 @@ func (a *AI) Move() {
 	a.vy = a.fy * a.speed
 
 	normalized := math.Sqrt(math.Pow(float64(a.vx), 2) + math.Pow(float64(a.vy), 2))
-	if normalized == 0 {
-		return
-	}
 	a.px += float64(a.vx) / normalized
 	if a.px >= screenWidth-padding {
 		a.px = screenWidth - padding - 1

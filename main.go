@@ -33,6 +33,7 @@ type Runner struct {
 	px, py      float64 // position
 	speed       int
 	clockOffset int
+	sprite      func(clock int) *ebiten.Image
 }
 
 func (r *Runner) Move() {
@@ -61,6 +62,11 @@ func (r *Runner) Move() {
 	}
 	if !isYPressed {
 		r.vy = 0
+	}
+	if r.vx != 0 || r.vy != 0 {
+		r.sprite = runnerWalkingFrame
+	} else {
+		r.sprite = runnerWaitingFrame
 	}
 	if !isXPressed && !isYPressed {
 		return
@@ -94,14 +100,7 @@ func (r *Runner) Draw(screen *ebiten.Image, clock int) {
 		r.py-frameHeight/2,
 	)
 
-	var sprite *ebiten.Image
-	if r.vx != 0 || r.vy != 0 {
-		sprite = runnerWalkingFrame(clock + r.clockOffset)
-	} else {
-		sprite = runnerWaitingFrame(clock + r.clockOffset)
-	}
-
-	screen.DrawImage(sprite, op)
+	screen.DrawImage(r.sprite(clock+r.clockOffset), op)
 }
 
 func runnerWalkingFrame(clock int) *ebiten.Image {
@@ -178,11 +177,12 @@ func (g *Game) init() {
 		g.inited = true
 	}()
 	g.runner = Runner{
-		speed: 1,
-		px:    screenWidth / 2,
-		py:    screenHeight / 2,
+		speed:  1,
+		px:     screenWidth / 2,
+		py:     screenHeight / 2,
+		sprite: runnerWaitingFrame,
 	}
-	numAI := 100
+	numAI := 50
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < numAI; i++ {
 		g.ais = append(g.ais, newAI(1))
