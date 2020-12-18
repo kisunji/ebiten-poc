@@ -1,38 +1,41 @@
 package main
 
 import (
-	"github.com/hajimehoshi/ebiten/v2"
 	"log"
 	"math"
 	"math/rand"
 	"time"
 )
 
+var AIId int
+
+func newAI(speed int) *AI {
+	AIId++
+	ai := &AI{
+		Runner: Runner{
+			speed:       speed,
+			px:          float64(padding + rand.Intn(screenWidth-padding*3)),
+			py:          float64(padding + rand.Intn(screenHeight-padding*3)),
+			clockOffset: rand.Intn(10),
+		},
+		id:      AIId,
+		moveCmd: nil,
+		running: false,
+	}
+	return ai
+}
+
 type AI struct {
 	Runner
 
-	id int
-	killSig chan struct{}
+	id      int
 	moveCmd *movement
 	running bool
 }
 
-const (
-	Up direction = iota
-	Down
-	Left
-	Right
-	UpRight
-	UpLeft
-	DownRight
-	DownLeft
-)
-
-type direction int
-
 type movement struct {
-	d     direction
-	units int
+	fx, fy int
+	repeat int
 }
 
 func Run(ai *AI) {
@@ -47,11 +50,35 @@ func Run(ai *AI) {
 		if ai.moveCmd == nil {
 			t := rand.Intn(5000)
 			time.Sleep(time.Duration(t) * time.Millisecond)
-			ai.moveCmd = &movement{
-				d: direction(rand.Intn(8)),
-				units: rand.Intn(200),
-			}
+			ai.moveCmd = computeMovement(ai.px, ai.py)
 		}
+	}
+}
+
+func computeMovement(px, py float64) *movement {
+	biasx := px/float64(screenWidth) - .5
+	biasy := py/float64(screenHeight) - .5
+	fx := 0
+	if rawx := math.Round(rand.NormFloat64() - biasx); rawx < 0 {
+		fx = -1
+	} else if rawx > 0 {
+		fx = 1
+	}
+	fy := 0
+	if rawy := math.Round(rand.NormFloat64() - biasy); rawy < 0 {
+		fy = -1
+	} else if rawy > 0 {
+		fy = 1
+	}
+
+	if fx == 0 && fy == 0 {
+		return nil
+	}
+
+	return &movement{
+		fx:     fx,
+		fy:     fy,
+		repeat: rand.Intn(200),
 	}
 }
 
@@ -61,81 +88,36 @@ func (a *AI) Move() {
 		a.vy = 0
 		return
 	}
-	switch a.moveCmd.d {
-	case Up:
-		a.fy = -1
-		a.vy = -1
-	case Down:
-		a.fy = 1
-		a.vy = 1
-	case Left:
-		a.fx = -1
-		a.vx = -1
-	case Right:
-		a.fx = 1
-		a.vx = 1
-	case UpLeft:
-		a.fx = -1
-		a.fy = -1
-		a.vx = -1
-		a.vy = -1
-	case UpRight:
-		a.fx = 1
-		a.fy = -1
-		a.vx = 1
-		a.vy = -1
-	case DownLeft:
-		a.fx = -1
-		a.fy = 1
-		a.vx = -1
-		a.vy = 1
-	case DownRight:
-		a.fx = 1
-		a.fy = 1
-		a.vx = 1
-		a.vy = 1
-	default:
-		panic("unknown direction")
-	}
 
-	normalized := math.Sqrt(math.Pow(a.vx, 2) + math.Pow(a.vy, 2))
-	a.px += (a.vx * a.speed) / normalized
+	defer func() {
+		a.moveCmd.repeat--
+		if a.moveCmd.repeat <= 0 {
+			a.moveCmd = nil
+		}
+	}()
+
+	a.fx = a.moveCmd.fx
+	a.vx = a.fx * a.speed
+
+	a.fy = a.moveCmd.fy
+	a.vy = a.fy * a.speed
+
+	normalized := math.Sqrt(math.Pow(float64(a.vx), 2) + math.Pow(float64(a.vy), 2))
+	if normalized == 0 {
+		return
+	}
+	a.px += float64(a.vx) / normalized
 	if a.px >= screenWidth-padding {
 		a.px = screenWidth - padding - 1
 	}
 	if a.px <= padding {
 		a.px = padding + 1
 	}
-	a.py += (a.vy * a.speed) / normalized
+	a.py += float64(a.vy) / normalized
 	if a.py >= screenHeight-padding-10 {
 		a.py = screenHeight - padding - 11
 	}
 	if a.py <= padding {
 		a.py = padding + 1
 	}
-	a.moveCmd.units--
-	if a.moveCmd.units <= 0 {
-		a.moveCmd = nil
-	}
-}
-
-func (a *AI) Draw(screen *ebiten.Image, clock int) {
-	op := &ebiten.DrawImageOptions{}
-	if a.fx < 0 {
-		op.GeoM.Scale(-1, 1)
-		op.GeoM.Translate(frameWidth, 0)
-	}
-	op.GeoM.Translate(
-		a.px-frameWidth/2,
-		a.py-frameHeight/2,
-	)
-
-	var sprite *ebiten.Image
-	if a.vx != 0 || a.vy != 0 {
-		sprite = runnerWalkingFrame(clock)
-	} else {
-		sprite = runnerWaitingFrame(clock)
-	}
-
-	screen.DrawImage(sprite, op)
 }

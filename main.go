@@ -2,14 +2,16 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 	"image"
 	_ "image/png"
 	"log"
 	"math"
 	"math/rand"
-
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
+	"time"
 )
 
 const (
@@ -26,10 +28,11 @@ var (
 )
 
 type Runner struct {
-	fx, fy float64 // facing
-	vx, vy float64 // velocity
-	px, py float64 // position
-	speed  float64
+	fx, fy      int     // facing
+	vx, vy      int     // velocity
+	px, py      float64 // position
+	speed       int
+	clockOffset int
 }
 
 func (r *Runner) Move() {
@@ -51,8 +54,8 @@ func (r *Runner) Move() {
 		r.fy = 1
 		isYPressed = true
 	}
-	r.vx = r.fx*r.speed
-	r.vy = r.fy*r.speed
+	r.vx = r.fx * r.speed
+	r.vy = r.fy * r.speed
 	if !isXPressed {
 		r.vx = 0
 	}
@@ -62,15 +65,16 @@ func (r *Runner) Move() {
 	if !isXPressed && !isYPressed {
 		return
 	}
-	normalized := math.Sqrt(math.Pow(r.vx, 2) + math.Pow(r.vy, 2))
-	r.px += r.vx / normalized
+
+	normalized := math.Sqrt(math.Pow(float64(r.vx), 2) + math.Pow(float64(r.vy), 2))
+	r.px += float64(r.vx) / normalized
 	if r.px >= screenWidth-padding {
 		r.px = screenWidth - padding - 1
 	}
 	if r.px <= padding {
 		r.px = padding + 1
 	}
-	r.py += r.vy / normalized
+	r.py += float64(r.vy) / normalized
 	if r.py >= screenHeight-padding-10 {
 		r.py = screenHeight - padding - 11
 	}
@@ -92,9 +96,9 @@ func (r *Runner) Draw(screen *ebiten.Image, clock int) {
 
 	var sprite *ebiten.Image
 	if r.vx != 0 || r.vy != 0 {
-		sprite = runnerWalkingFrame(clock)
+		sprite = runnerWalkingFrame(clock + r.clockOffset)
 	} else {
-		sprite = runnerWaitingFrame(clock)
+		sprite = runnerWaitingFrame(clock + r.clockOffset)
 	}
 
 	screen.DrawImage(sprite, op)
@@ -161,6 +165,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for _, ai := range g.ais {
 		ai.Draw(screen, g.count/g.speed)
 	}
+	msg := fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f\n", ebiten.CurrentTPS(), ebiten.CurrentFPS())
+	ebitenutil.DebugPrint(screen, msg)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -176,32 +182,14 @@ func (g *Game) init() {
 		px:    screenWidth / 2,
 		py:    screenHeight / 2,
 	}
-	g.ais = append(g.ais, newAI(1))
-	g.ais = append(g.ais, newAI(1))
-	g.ais = append(g.ais, newAI(1))
-	g.ais = append(g.ais, newAI(1))
-	g.ais = append(g.ais, newAI(1))
+	numAI := 100
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < numAI; i++ {
+		g.ais = append(g.ais, newAI(1))
+	}
 	for _, ai := range g.ais {
 		go Run(ai)
 	}
-}
-
-var AIId int
-
-func newAI(speed float64) *AI {
-	AIId++
-	ai := &AI{
-		Runner: Runner{
-			speed: speed,
-			px:    padding + float64(rand.Intn(screenWidth-padding*2)),
-			py:    padding + float64(rand.Intn(screenHeight-padding*2)),
-		},
-		id:      AIId,
-		killSig: nil,
-		moveCmd: nil,
-		running: false,
-	}
-	return ai
 }
 
 func main() {
@@ -210,6 +198,7 @@ func main() {
 		log.Fatal(err)
 	}
 	runnerImage = ebiten.NewImageFromImage(img)
+	ebiten.SetRunnableOnUnfocused(true)
 	ebiten.SetWindowResizable(true)
 	ebiten.SetWindowSize(screenWidth*2, screenHeight*2)
 	ebiten.SetWindowTitle("Hello, World!")
