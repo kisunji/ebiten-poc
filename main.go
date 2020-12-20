@@ -183,7 +183,7 @@ func (g *Game) init() {
 		py:     screenHeight / 2,
 		sprite: runnerWaitingFrame,
 	}
-	numAI := 10
+	numAI := 50
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < numAI; i++ {
 		g.ais = append(g.ais, newAI(1))

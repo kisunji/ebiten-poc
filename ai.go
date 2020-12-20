@@ -48,7 +48,7 @@ func Run(ai *AI) {
 			log.Printf("killed ai %d", ai.id)
 			break
 		}
-		t := rand.Intn(5000)
+		t := rand.Intn(10000)
 		time.Sleep(time.Duration(t) * time.Millisecond)
 		if ai.moveCmd == nil {
 			ai.moveCmd = computeMovement(ai.px, ai.py)
