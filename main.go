@@ -3,15 +3,16 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 	"image"
 	_ "image/png"
 	"log"
 	"math"
 	"math/rand"
 	"time"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 )
 
 const (
@@ -182,7 +183,7 @@ func (g *Game) init() {
 		py:     screenHeight / 2,
 		sprite: runnerWaitingFrame,
 	}
-	numAI := 50
+	numAI := 10
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < numAI; i++ {
 		g.ais = append(g.ais, newAI(1))
@@ -198,7 +199,6 @@ func main() {
 		log.Fatal(err)
 	}
 	runnerImage = ebiten.NewImageFromImage(img)
-	ebiten.SetRunnableOnUnfocused(true)
 	ebiten.SetWindowResizable(true)
 	ebiten.SetWindowSize(screenWidth*2, screenHeight*2)
 	ebiten.SetWindowTitle("Hello, World!")
