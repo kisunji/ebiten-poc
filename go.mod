@@ -1,4 +1,4 @@
-module hidden
+module ebiten-poc
 
 go 1.15
 
