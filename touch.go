@@ -15,7 +15,7 @@ func leftTouched() bool {
 func rightTouched() bool {
 	for _, id := range ebiten.TouchIDs() {
 		x, _ := ebiten.TouchPosition(id)
-		if x >= screenWidth/3 {
+		if x >= 2*screenWidth/3 {
 			return true
 		}
 	}
@@ -25,7 +25,7 @@ func rightTouched() bool {
 func downTouched() bool {
 	for _, id := range ebiten.TouchIDs() {
 		_, y := ebiten.TouchPosition(id)
-		if y < screenHeight/3 {
+		if y >= 2*screenHeight/3 {
 			return true
 		}
 	}
@@ -35,10 +35,9 @@ func downTouched() bool {
 func upTouched() bool {
 	for _, id := range ebiten.TouchIDs() {
 		_, y := ebiten.TouchPosition(id)
-		if y >= screenHeight/3 {
+		if y < screenHeight/3 {
 			return true
 		}
 	}
 	return false
 }
-
