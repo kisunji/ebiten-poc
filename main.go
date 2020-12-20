@@ -40,19 +40,19 @@ type Runner struct {
 func (r *Runner) Move() {
 	isXPressed := false
 	isYPressed := false
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
+	if ebiten.IsKeyPressed(ebiten.KeyD) || rightTouched() {
 		r.fx = 1
 		isXPressed = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
+	if ebiten.IsKeyPressed(ebiten.KeyA) || leftTouched() {
 		r.fx = -1
 		isXPressed = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
+	if ebiten.IsKeyPressed(ebiten.KeyW)|| upTouched() {
 		r.fy = -1
 		isYPressed = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
+	if ebiten.IsKeyPressed(ebiten.KeyS) || downTouched() {
 		r.fy = 1
 		isYPressed = true
 	}
