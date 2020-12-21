@@ -1,9 +1,9 @@
 syntax = "proto3";
+import "update_entity.proto";
+
 option go_package = "github.com/kisunji/ebiten-poc/pb";
 package pb;
 
-message ConnectResponse {
-  int32 ClientSlot = 1;
-  double px = 2;
-  double py = 3;
+message UpdateAll {
+  repeated UpdateEntity Updates = 1;
 }

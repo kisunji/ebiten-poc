@@ -5,15 +5,25 @@ import (
 	"log"
 	"net/http"
 
-	"ebiten-poc/netcode"
+	"ebiten-poc/game"
+	"ebiten-poc/server"
 )
 
 var port = flag.String("port", ":8080", "http service address")
 
 func main() {
 	flag.Parse()
-	hub := netcode.NewHub(*port)
+
+	go server.Run()
+
+	hub := server.NewHub()
 	go hub.Run()
+
+	for i := game.MaxClients; i < game.MaxChars; i++ {
+		id := i
+		go server.RunAI(server.NewAI(int32(id)), hub)
+	}
+
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		hub.ServeWs(w, r)
 	})

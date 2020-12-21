@@ -1,4 +1,4 @@
-package netcode
+package server
 
 import (
 	"log"
@@ -12,10 +12,10 @@ const (
 	writeWait = 1000 * time.Millisecond
 
 	// Time allowed to read the next pong message from the peer.
-	pongWait = 15 * time.Second
+	pongWait = 10 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = 10 * time.Second
+	pingPeriod = 5 * time.Second
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 128
@@ -43,17 +43,6 @@ type Client struct {
 
 	// Client slot
 	clientSlot int32
-
-	// Arbitrary data for user-code use. Store the related player entity, etc.
-	data interface{}
-}
-
-func (c *Client) SetData(data interface{}) {
-	c.data = data
-}
-
-func (c *Client) Data() interface{} {
-	return c.data
 }
 
 func (c *Client) ClientSlot() int32 {
@@ -88,13 +77,13 @@ func (c *Client) ReadPump() {
 			}
 			break
 		}
-		c.Hub.broadcast <- Message{
+		c.Hub.clientData <- Message{
 			client: c,
 			data:   buf,
 		}
 	}
 	c.Hub.unregister <- c
-	log.Printf("timeout in slot %d", c.clientSlot)
+	log.Printf("slot %d disconnected", c.clientSlot)
 	_ = c.Conn.Close()
 }
 
