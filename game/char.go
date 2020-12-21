@@ -58,13 +58,6 @@ func (cc Chars) UpdateFromData(input *pb.UpdateEntity) {
 	c.Speed = int(input.Speed)
 }
 
-type GenericInput interface {
-	GetRightPressed()bool
-	GetLeftPressed()bool
-	GetUpPressed()bool
-	GetDownPressed()bool
-}
-
 func (c *Char) ProcessInput(input *pb.Input) {
 	if input.RightPressed {
 		c.Fx = 1

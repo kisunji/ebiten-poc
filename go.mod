@@ -1,4 +1,4 @@
-module ebiten-poc
+module github.com/kisunji/ebiten-poc
 
 go 1.15
 
