@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"time"
 
-	"ebiten-poc/pb"
+	"github.com/kisunji/ebiten-poc/pb"
 )
 
 func NewChar() *Char {

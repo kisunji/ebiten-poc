@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/game"
 )
 
 type AIData struct {

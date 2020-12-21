@@ -3,7 +3,7 @@ package server
 import (
 	"time"
 
-	"ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/game"
 )
 
 const (

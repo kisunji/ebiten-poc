@@ -8,10 +8,10 @@ import (
 	"log"
 	"time"
 
-	"ebiten-poc/pb"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
+	"github.com/kisunji/ebiten-poc/pb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,7 +20,7 @@ const (
 	ScreenHeight  = 480
 	ScreenPadding = 10
 
-	MaxChars = 64
+	MaxChars   = 64
 	MaxClients = 8
 )
 

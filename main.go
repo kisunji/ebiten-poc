@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"ebiten-poc/game"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/kisunji/ebiten-poc/game"
 )
 
 func main() {

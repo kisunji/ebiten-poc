@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"ebiten-poc/game"
-	"ebiten-poc/pb"
+	"github.com/kisunji/ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/pb"
 	"google.golang.org/protobuf/proto"
 )
 

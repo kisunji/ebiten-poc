@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"ebiten-poc/game"
-	"ebiten-poc/server"
+	"github.com/kisunji/ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/server"
 )
 
 var port = flag.String("port", ":8080", "http service address")
