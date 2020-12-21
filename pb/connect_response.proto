@@ -1,0 +1,7 @@
+syntax = "proto3";
+option go_package = "github.com/kisunji/ebiten-poc/pb";
+package pb;
+
+message ConnectResponse {
+  int ClientSlot = 1;
+}

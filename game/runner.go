@@ -1,4 +1,4 @@
-package main
+package game
 
 import (
 	"image"
@@ -63,18 +63,18 @@ func (r *Runner) Move() {
 
 	normalized := math.Sqrt(math.Pow(float64(r.vx), 2) + math.Pow(float64(r.vy), 2))
 	r.px += float64(r.vx) / normalized
-	if r.px >= screenWidth-padding {
-		r.px = screenWidth - padding - 1
+	if r.px >= ScreenWidth-ScreenPadding {
+		r.px = ScreenWidth - ScreenPadding - 1
 	}
-	if r.px <= padding {
-		r.px = padding + 1
+	if r.px <= ScreenPadding {
+		r.px = ScreenPadding + 1
 	}
 	r.py += float64(r.vy) / normalized
-	if r.py >= screenHeight-padding-10 {
-		r.py = screenHeight - padding - 11
+	if r.py >= ScreenHeight-ScreenPadding-10 {
+		r.py = ScreenHeight - ScreenPadding - 11
 	}
-	if r.py <= padding {
-		r.py = padding + 1
+	if r.py <= ScreenPadding {
+		r.py = ScreenPadding + 1
 	}
 }
 

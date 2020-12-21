@@ -1,4 +1,4 @@
-package main
+package game
 
 import (
 	"log"
@@ -14,8 +14,8 @@ func newAI(speed int) *AI {
 	ai := &AI{
 		Runner: Runner{
 			speed:       speed,
-			px:          float64(padding + rand.Intn(screenWidth-padding*3)),
-			py:          float64(padding + rand.Intn(screenHeight-padding*3)),
+			px:          float64(ScreenPadding + rand.Intn(ScreenWidth-ScreenPadding*3)),
+			py:          float64(ScreenPadding + rand.Intn(ScreenHeight-ScreenPadding*3)),
 			clockOffset: rand.Intn(10),
 			sprite:      runnerWaitingFrame,
 		},
@@ -57,8 +57,8 @@ func Run(ai *AI) {
 }
 
 func computeMovement(px, py float64) *movement {
-	biasx := px/float64(screenWidth) - .5
-	biasy := py/float64(screenHeight) - .5
+	biasx := px/float64(ScreenWidth) - .5
+	biasy := py/float64(ScreenHeight) - .5
 	fx := 0
 	if rawx := math.Round(rand.NormFloat64() - biasx); rawx < 0 {
 		fx = -1
@@ -107,17 +107,17 @@ func (a *AI) Move() {
 
 	normalized := math.Sqrt(math.Pow(float64(a.vx), 2) + math.Pow(float64(a.vy), 2))
 	a.px += float64(a.vx) / normalized
-	if a.px >= screenWidth-padding {
-		a.px = screenWidth - padding - 1
+	if a.px >= ScreenWidth-ScreenPadding {
+		a.px = ScreenWidth - ScreenPadding - 1
 	}
-	if a.px <= padding {
-		a.px = padding + 1
+	if a.px <= ScreenPadding {
+		a.px = ScreenPadding + 1
 	}
 	a.py += float64(a.vy) / normalized
-	if a.py >= screenHeight-padding-10 {
-		a.py = screenHeight - padding - 11
+	if a.py >= ScreenHeight-ScreenPadding-10 {
+		a.py = ScreenHeight - ScreenPadding - 11
 	}
-	if a.py <= padding {
-		a.py = padding + 1
+	if a.py <= ScreenPadding {
+		a.py = ScreenPadding + 1
 	}
 }

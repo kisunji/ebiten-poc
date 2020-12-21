@@ -1,4 +1,4 @@
-package client
+package game
 
 import (
 	"log"
@@ -12,10 +12,10 @@ const (
 	writeWait = 5000 * time.Millisecond
 
 	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
+	pongWait = 15 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
+	pingPeriod = 10 * time.Second
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 512
@@ -65,10 +65,6 @@ func (c *Client) Listen() {
 	go c.readPump()
 }
 
-func (c *Client) ChRecv() chan []byte { return c.recv }
-
-func (c *Client) ChDisconnected() chan bool { return c.disconnect }
-
 func (c *Client) SendMessage(message []byte) {
 	c.send <- message
 }
@@ -117,6 +113,7 @@ func (c *Client) writePump() {
 			if !ok {
 				// The hub closed the channel.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				log.Println("server closed")
 				return
 			}
 
@@ -130,8 +127,10 @@ func (c *Client) writePump() {
 				return
 			}
 		case <-ticker.C:
+			log.Println("client pinging")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Println(err)
 				return
 			}
 		}

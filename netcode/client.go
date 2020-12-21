@@ -1,4 +1,4 @@
-package server
+package netcode
 
 import (
 	"log"
@@ -12,10 +12,10 @@ const (
 	writeWait = 1000 * time.Millisecond
 
 	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
+	pongWait = 15 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
+	pingPeriod = 10 * time.Second
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 128
@@ -33,16 +33,16 @@ type Message struct {
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	hub *Hub
+	Hub *Hub
 
 	// The websocket connection.
-	conn *websocket.Conn
+	Conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan []byte
+	Send chan []byte
 
 	// Client slot
-	clientSlot int
+	clientSlot int32
 
 	// Arbitrary data for user-code use. Store the related player entity, etc.
 	data interface{}
@@ -56,66 +56,70 @@ func (c *Client) Data() interface{} {
 	return c.data
 }
 
-func (c *Client) ClientSlot() int {
+func (c *Client) ClientSlot() int32 {
 	return c.clientSlot
 }
 
-func (c *Client) SendMessage(message []byte) {
-	c.send <- message
+func (c *Client) SendMessage(m []byte) {
+	c.Send <- m
 }
 
-// readPump pumps messages from the websocket connection to the hub.
+// ReadPump pumps messages from the websocket connection to the Hub.
 //
-// The application runs readPump in a per-connection goroutine. The application
+// The application runs ReadPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *Client) readPump() {
+func (c *Client) ReadPump() {
 	defer func() {
-		c.hub.unregister <- c
-		c.conn.Close()
+		c.Hub.unregister <- c
+		c.Conn.Close()
 	}()
-	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.Conn.SetReadLimit(maxMessageSize)
+	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.Conn.SetPongHandler(func(string) error {
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
 	for {
-		_, buf, err := c.conn.ReadMessage()
+		_, buf, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Println(err)
 			}
 			break
 		}
-		c.hub.broadcast <- Message{
+		c.Hub.broadcast <- Message{
 			client: c,
 			data:   buf,
 		}
 	}
-	c.hub.unregister <- c
-	_ = c.conn.Close()
+	c.Hub.unregister <- c
+	log.Printf("timeout in slot %d", c.clientSlot)
+	_ = c.Conn.Close()
 }
 
-// writePump pumps messages from the hub to the websocket connection.
+// WritePump pumps messages from the Hub to the websocket connection.
 //
-// A goroutine running writePump is started for each connection. The
+// A goroutine running WritePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) writePump() {
+func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		_ = c.conn.Close()
+		_ = c.Conn.Close()
 	}()
 	for {
 		select {
-		case message, ok := <-c.send:
-			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+		case message, ok := <-c.Send:
+			_ = c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
-				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.BinaryMessage)
+			w, err := c.Conn.NextWriter(websocket.BinaryMessage)
 			if err != nil {
 				return
 			}
@@ -125,8 +129,8 @@ func (c *Client) writePump() {
 				return
 			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
