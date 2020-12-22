@@ -10,6 +10,9 @@ import (
 )
 
 var port = flag.String("port", ":8080", "http service address")
+var insecure = flag.Bool("insecure", false, "listen over insecure ws")
+var cert = flag.String("cert", "", "path to cert file")
+var key = flag.String("key", "", "path to key file")
 
 func main() {
 	flag.Parse()
@@ -28,8 +31,18 @@ func main() {
 		hub.ServeWs(w, r)
 	})
 	log.Printf("listening on port %s\n", *port)
-	err := http.ListenAndServe(*port, nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+	if *insecure {
+		err := http.ListenAndServe(*port, nil)
+		if err != nil {
+			log.Fatal("ListenAndServe: ", err)
+		}
+	} else {
+		if *cert == "" || *key == "" {
+			log.Fatal("must provide --cert and --key")
+		}
+		err := http.ListenAndServeTLS(*port, *cert, *key, nil)
+		if err != nil {
+			log.Fatal("ListenAndServeTLS: ", err)
+		}
 	}
 }

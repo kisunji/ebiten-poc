@@ -11,7 +11,7 @@ import (
 
 func main() {
 	c := game.NewClient()
-	err := c.Dial("ws.chriskim.dev:3000")
+	err := c.DialTLS("ws.chriskim.dev:3000")
 	if err != nil {
 		log.Fatal(err)
 	}
