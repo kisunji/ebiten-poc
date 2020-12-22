@@ -122,14 +122,13 @@ func (c *Client) writePump(ctx context.Context) {
 				return
 			}
 		case <-ticker.C:
-			lastPinged := time.Now()
-			log.Println(lastPinged.String())
+			lastPinged := time.Now().UnixNano()
 			err := c.conn.Ping(ctx)
 			if err != nil {
 				c.Latency = 999
 				return
 			}
-			c.Latency = time.Since(lastPinged).Milliseconds()
+			c.Latency = (time.Now().UnixNano() - lastPinged) / 1e6
 		}
 	}
 }
