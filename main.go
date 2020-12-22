@@ -11,7 +11,7 @@ import (
 
 func main() {
 	c := game.NewClient()
-	err := c.Dial("localhost:8080")
+	err := c.Dial("ws.chriskim.dev:3000")
 	if err != nil {
 		log.Fatal(err)
 	}
