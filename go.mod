@@ -7,4 +7,5 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/hajimehoshi/ebiten/v2 v2.0.1
 	google.golang.org/protobuf v1.25.0
+	nhooyr.io/websocket v1.8.6
 )

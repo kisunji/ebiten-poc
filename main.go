@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -14,7 +15,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	go c.Listen()
+	go c.Listen(context.Background())
 	ebiten.SetRunnableOnUnfocused(true)
 	ebiten.SetWindowResizable(true)
 	ebiten.SetWindowSize(common.ScreenWidth*2, common.ScreenHeight*2)

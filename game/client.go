@@ -1,19 +1,14 @@
 package game
 
 import (
+	"context"
 	"log"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 const (
-	// Time allowed to write a message to the peer.
-	writeWait = 5000 * time.Millisecond
-
-	// Time allowed to read the next pong message from the peer.
-	pongWait = 10 * time.Second
-
 	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = 5 * time.Second
 
@@ -31,7 +26,6 @@ type Client struct {
 	// Disconnect
 	Disconnect chan bool
 	conn       *websocket.Conn
-	lastPinged time.Time
 	Latency    int64
 }
 
@@ -45,7 +39,9 @@ func NewClient() *Client {
 }
 
 func (c *Client) Dial(addr string) error {
-	conn, _, err := websocket.DefaultDialer.Dial("ws://"+addr+"/ws", nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, "ws://"+addr+"/ws", nil)
 	if err != nil {
 		return err
 	}
@@ -54,7 +50,9 @@ func (c *Client) Dial(addr string) error {
 }
 
 func (c *Client) DialTLS(addr string) error {
-	conn, _, err := websocket.DefaultDialer.Dial("wss://"+addr+"/ws", nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, "wss://"+addr+"/ws", nil)
 	if err != nil {
 		return err
 	}
@@ -62,9 +60,9 @@ func (c *Client) DialTLS(addr string) error {
 	return nil
 }
 
-func (c *Client) Listen() {
-	go c.writePump()
-	go c.readPump()
+func (c *Client) Listen(ctx context.Context) {
+	go c.writePump(ctx)
+	go c.readPump(ctx)
 }
 
 func (c *Client) SendMessage(message []byte) {
@@ -76,26 +74,18 @@ func (c *Client) SendMessage(message []byte) {
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *Client) readPump() {
+func (c *Client) readPump(ctx context.Context) {
 	defer func() {
-		c.conn.Close()
+		c.conn.Close(websocket.StatusInternalError, "unexpected close")
 		c.Disconnect <- true
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		c.Latency = time.Since(c.lastPinged).Milliseconds()
-		return nil
-	})
 	for {
-		_, buf, err := c.conn.ReadMessage()
+		_, buf, err := c.conn.Read(ctx)
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
-			}
 			break
 		}
+
 		c.Recv <- buf
 	}
 }
@@ -105,25 +95,24 @@ func (c *Client) readPump() {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) writePump() {
+func (c *Client) writePump(ctx context.Context) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		c.conn.Close(websocket.StatusInternalError, "unexpected close")
 		c.Disconnect <- true
 	}()
 	for {
 		select {
 		case message, ok := <-c.Send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.conn.Write(ctx, websocket.MessageText, []byte("closed"))
 				log.Println("server closed")
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.BinaryMessage)
+			w, err := c.conn.Writer(ctx, websocket.MessageBinary)
 			if err != nil {
 				return
 			}
@@ -133,12 +122,13 @@ func (c *Client) writePump() {
 				return
 			}
 		case <-ticker.C:
-			c.lastPinged = time.Now()
-			c.conn.SetWriteDeadline(c.lastPinged.Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Println(err)
+			lastPinged := time.Now()
+			err := c.conn.Ping(ctx)
+			if err != nil {
+				c.Latency = 999
 				return
 			}
+			c.Latency = time.Since(lastPinged).Milliseconds()
 		}
 	}
 }
