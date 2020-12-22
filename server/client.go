@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -24,6 +25,15 @@ const (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		if len(r.Header["Origin"]) == 0 {
+			return true
+		}
+		if r.Header["Origin"][0] == "https://kisunji.github.io" {
+			return true
+		}
+		return false
+	},
 }
 
 type Message struct {
