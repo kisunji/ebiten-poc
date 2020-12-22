@@ -123,6 +123,7 @@ func (c *Client) writePump(ctx context.Context) {
 			}
 		case <-ticker.C:
 			lastPinged := time.Now()
+			log.Println(lastPinged.String())
 			err := c.conn.Ping(ctx)
 			if err != nil {
 				c.Latency = 999
