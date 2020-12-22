@@ -1,4 +1,4 @@
-package game
+package common
 
 import (
 	"math"
@@ -10,32 +10,29 @@ import (
 
 func NewChar() *Char {
 	return &Char{
-		Fx:          1,
-		Fy:          1,
-		Px:          float64(ScreenPadding + rand.Intn(ScreenWidth-ScreenPadding*3)),
-		Py:          float64(ScreenPadding + rand.Intn(ScreenHeight-ScreenPadding*3)),
-		Speed:       1,
-		clockOffset: rand.Intn(10),
+		Fx:    1,
+		Fy:    1,
+		Px:    float64(ScreenPadding + rand.Intn(ScreenWidth-ScreenPadding*3)),
+		Py:    float64(ScreenPadding + rand.Intn(ScreenHeight-ScreenPadding*3)),
+		Speed: 1,
 	}
 }
 
 func NewCharAt(px, py float64) *Char {
 	return &Char{
-		Fx:          1,
-		Fy:          1,
-		Px:          px,
-		Py:          py,
-		Speed:       1,
-		clockOffset: rand.Intn(10),
+		Fx:    1,
+		Fy:    1,
+		Px:    px,
+		Py:    py,
+		Speed: 1,
 	}
 }
 
 type Char struct {
-	Fx, Fy      int     // facing
-	Vx, Vy      int     // velocity
-	Px, Py      float64 // position
-	Speed       int
-	clockOffset int
+	Fx, Fy int     // facing
+	Vx, Vy int     // velocity
+	Px, Py float64 // position
+	Speed  int
 
 	// used by server only
 	lastUpdatedTimer time.Time

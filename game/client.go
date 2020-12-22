@@ -23,24 +23,24 @@ const (
 
 type Client struct {
 	// Inbound messages from the server.
-	recv chan []byte
+	Recv chan []byte
 
 	// Outbound messages to the server.
-	send chan []byte
+	Send chan []byte
 
 	// Disconnect
-	disconnect chan bool
+	Disconnect chan bool
 	conn       *websocket.Conn
 	lastPinged time.Time
-	latency    int64
+	Latency    int64
 }
 
 func NewClient() *Client {
 	return &Client{
-		recv:       make(chan []byte, 256),
-		disconnect: make(chan bool),
+		Recv:       make(chan []byte, 256),
+		Disconnect: make(chan bool),
 		conn:       nil,
-		send:       make(chan []byte, 256),
+		Send:       make(chan []byte, 256),
 	}
 }
 
@@ -68,7 +68,7 @@ func (c *Client) Listen() {
 }
 
 func (c *Client) SendMessage(message []byte) {
-	c.send <- message
+	c.Send <- message
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -79,13 +79,13 @@ func (c *Client) SendMessage(message []byte) {
 func (c *Client) readPump() {
 	defer func() {
 		c.conn.Close()
-		c.disconnect <- true
+		c.Disconnect <- true
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		c.latency = time.Since(c.lastPinged).Milliseconds()
+		c.Latency = time.Since(c.lastPinged).Milliseconds()
 		return nil
 	})
 	for {
@@ -96,7 +96,7 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		c.recv <- buf
+		c.Recv <- buf
 	}
 }
 
@@ -110,11 +110,11 @@ func (c *Client) writePump() {
 	defer func() {
 		ticker.Stop()
 		c.conn.Close()
-		c.disconnect <- true
+		c.Disconnect <- true
 	}()
 	for {
 		select {
-		case message, ok := <-c.send:
+		case message, ok := <-c.Send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.

@@ -1,11 +1,14 @@
 package game
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/kisunji/ebiten-poc/common"
+)
 
 func leftTouched() bool {
 	for _, id := range ebiten.TouchIDs() {
 		x, _ := ebiten.TouchPosition(id)
-		if x < ScreenWidth/3 {
+		if x < common.ScreenWidth/3 {
 			return true
 		}
 	}
@@ -15,7 +18,7 @@ func leftTouched() bool {
 func rightTouched() bool {
 	for _, id := range ebiten.TouchIDs() {
 		x, _ := ebiten.TouchPosition(id)
-		if x >= 2*ScreenWidth/3 {
+		if x >= 2*common.ScreenWidth/3 {
 			return true
 		}
 	}
@@ -25,7 +28,7 @@ func rightTouched() bool {
 func downTouched() bool {
 	for _, id := range ebiten.TouchIDs() {
 		_, y := ebiten.TouchPosition(id)
-		if y >= 2*ScreenHeight/3 {
+		if y >= 2*common.ScreenHeight/3 {
 			return true
 		}
 	}
@@ -35,7 +38,7 @@ func downTouched() bool {
 func upTouched() bool {
 	for _, id := range ebiten.TouchIDs() {
 		_, y := ebiten.TouchPosition(id)
-		if y < ScreenHeight/3 {
+		if y < common.ScreenHeight/3 {
 			return true
 		}
 	}

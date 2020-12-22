@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/kisunji/ebiten-poc/common"
 	"github.com/kisunji/ebiten-poc/game"
 )
 
@@ -16,13 +17,13 @@ func main() {
 	go c.Listen()
 	ebiten.SetRunnableOnUnfocused(true)
 	ebiten.SetWindowResizable(true)
-	ebiten.SetWindowSize(game.ScreenWidth*2, game.ScreenHeight*2)
+	ebiten.SetWindowSize(common.ScreenWidth*2, common.ScreenHeight*2)
 	ebiten.SetWindowTitle("Hello, World!")
 	if err := ebiten.RunGame(&game.Game{
 		Op:     &ebiten.DrawImageOptions{},
 		Speed:  5,
 		Client: c,
-		Chars:  make([]*game.Char, game.MaxChars),
+		Chars:  make([]*common.Char, common.MaxChars),
 	}); err != nil {
 		log.Fatal(err)
 	}

@@ -2,11 +2,10 @@ package server
 
 import (
 	"log"
-	"math"
 	"math/rand"
 	"time"
 
-	"github.com/kisunji/ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/common"
 )
 
 type AIData struct {
@@ -18,7 +17,7 @@ type AIData struct {
 }
 
 func NewAI(id int32) *AI {
-	char := game.NewChar()
+	char := common.NewChar()
 	chars[id] = char
 	ai := &AI{
 		Char:    char,
@@ -29,7 +28,7 @@ func NewAI(id int32) *AI {
 }
 
 type AI struct {
-	*game.Char
+	*common.Char
 
 	id      int32
 	running bool
@@ -44,23 +43,31 @@ func RunAI(ai *AI, hub *Hub) {
 			log.Printf("killed ai %d", ai.id)
 			break
 		}
-		t := rand.Intn(10000)
-		time.Sleep(time.Duration(t) * time.Millisecond)
+		time.Sleep(time.Duration(rand.Intn(10000)) * time.Millisecond)
 		hub.AIChan <- computeMovement(ai)
+		// move for up to 5 seconds
+		time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
+		hub.AIChan <- AIData{
+			Id:           ai.id,
+			UpPressed:    false,
+			DownPressed:  false,
+			LeftPressed:  false,
+			RightPressed: false,
+		}
 	}
 }
 
 func computeMovement(ai *AI) AIData {
-	biasx := ai.Px/float64(game.ScreenWidth) - .5
-	biasy := ai.Py/float64(game.ScreenHeight) - .5
+	biasx := ai.Px/float64(common.ScreenWidth) - .5
+	biasy := ai.Py/float64(common.ScreenHeight) - .5
 	fx := 0
-	if rawx := math.Round(rand.NormFloat64() - biasx); rawx < 0 {
+	if rawx := rand.NormFloat64() - biasx; rawx < 0 {
 		fx = -1
 	} else if rawx > 0 {
 		fx = 1
 	}
 	fy := 0
-	if rawy := math.Round(rand.NormFloat64() - biasy); rawy < 0 {
+	if rawy := rand.NormFloat64() - biasy; rawy < 0 {
 		fy = -1
 	} else if rawy > 0 {
 		fy = 1

@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/kisunji/ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/common"
 	"github.com/kisunji/ebiten-poc/pb"
 	"google.golang.org/protobuf/proto"
 )
@@ -18,7 +18,7 @@ type Hub struct {
 	clientSlots []bool
 
 	// Registered clients.
-	clients map[*Client]*game.Char
+	clients map[*Client]*common.Char
 
 	// Inbound messages from the clients.
 	clientData chan Message
@@ -35,11 +35,11 @@ type Hub struct {
 // Create new chat hub.
 func NewHub() *Hub {
 	return &Hub{
-		clientSlots: make([]bool, game.MaxClients),
+		clientSlots: make([]bool, common.MaxClients),
 		clientData:  make(chan Message),
 		register:    make(chan *Client),
 		unregister:  make(chan *Client),
-		clients:     make(map[*Client]*game.Char),
+		clients:     make(map[*Client]*common.Char),
 		AIChan:      make(chan AIData),
 	}
 }
@@ -48,7 +48,7 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
-			char := game.NewChar()
+			char := common.NewChar()
 			chars[client.clientSlot] = char
 			h.clients[client] = char
 			h.clientSlots[client.clientSlot] = true
@@ -87,7 +87,6 @@ func (h *Hub) Run() {
 		case client := <-h.unregister:
 			h.disconnect(client)
 		case msg := <-h.clientData:
-			log.Printf("received msg from slot %d", msg.client.clientSlot)
 			kind := pb.Kind(msg.data[0])
 			buf := msg.data[1:]
 			switch kind {
@@ -132,7 +131,7 @@ func (h *Hub) Run() {
 				RightPressed: aiInput.RightPressed,
 			}
 			if char == nil {
-				char = &game.Char{}
+				char = &common.Char{}
 				chars[aiInput.Id] = char
 			}
 			char.ProcessInput(input)

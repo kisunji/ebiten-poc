@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/kisunji/ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/common"
 	"github.com/kisunji/ebiten-poc/server"
 )
 
@@ -19,7 +19,7 @@ func main() {
 	hub := server.NewHub()
 	go hub.Run()
 
-	for i := game.MaxClients; i < game.MaxChars; i++ {
+	for i := common.MaxClients; i < common.MaxChars; i++ {
 		id := i
 		go server.RunAI(server.NewAI(int32(id)), hub)
 	}

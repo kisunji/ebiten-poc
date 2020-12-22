@@ -3,14 +3,14 @@ package server
 import (
 	"time"
 
-	"github.com/kisunji/ebiten-poc/game"
+	"github.com/kisunji/ebiten-poc/common"
 )
 
 const (
 	updateFrequency = 1 * time.Second / 60
 )
 
-var chars = make([]*game.Char, game.MaxChars)
+var chars = make([]*common.Char, common.MaxChars)
 
 func Run() {
 	previous := time.Now()
