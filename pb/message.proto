@@ -6,6 +6,7 @@ message ClientMessage {
   oneof content {
     Input input = 1;
     StartGame startGame = 2;
+    WorldUpdate worldUpdate = 3;
   }
 }
 
@@ -18,6 +19,8 @@ message Input {
 
 message StartGame {}
 
+message WorldUpdate {}
+
 message ServerMessage {
   oneof content {
     ConnectResponse connectResponse = 1;
@@ -27,6 +30,7 @@ message ServerMessage {
     UpdateEntity updateEntity = 5;
     PlayerDisconnected playerDisconnected = 6;
     NewHost newHost = 7;
+    UpdateEntities updateEntities = 8;
   }
 }
 
@@ -63,4 +67,8 @@ message UpdateEntity {
   double Px = 6;
   double Py = 7;
   int32 speed = 8;
+}
+
+message UpdateEntities {
+  repeated UpdateEntity updateEntity = 1;
 }

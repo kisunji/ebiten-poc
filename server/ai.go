@@ -35,7 +35,7 @@ func (w *World) RunAI(ai *AI, aiChan chan AIData) {
 			continue
 		}
 		time.Sleep(time.Duration(rand.Intn(10000)) * time.Millisecond)
-		w.aiChan <- computeMovement(ai)
+		aiChan <- computeMovement(ai)
 		// move for up to 5 seconds
 		time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
 		// wait

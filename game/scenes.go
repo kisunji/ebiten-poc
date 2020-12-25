@@ -7,6 +7,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -23,7 +24,7 @@ type SceneHandler interface {
 }
 
 type StartMenu struct {
-	client *Client
+	client          *Client
 	hostGameHovered bool
 	scanningInput   bool
 	startPressed    bool
@@ -206,7 +207,7 @@ func (l *Lobby) Draw(screen *ebiten.Image) {
 			if l.hostId == int32(i) {
 				s = fmt.Sprintf("Player %d (host)", i)
 			} else {
-				s= fmt.Sprintf("Player %d", i)
+				s = fmt.Sprintf("Player %d", i)
 			}
 		} else {
 			s = "Not connected"
@@ -223,16 +224,28 @@ func (l *Lobby) Next() Scene {
 }
 
 type MainGame struct {
-	Client *Client
-	input  input
-	count  int
-	Speed  int
-	Chars  common.Chars
-	next   Scene
-	Op     *ebiten.DrawImageOptions
+	Client      *Client
+	input       input
+	count       int
+	Speed       int
+	Chars       common.Chars
+	next        Scene
+	Op          *ebiten.DrawImageOptions
+	lastUpdated time.Time
 }
 
 func (mg *MainGame) Update() {
+	if mg.lastUpdated.IsZero() {
+		log.Println("lastUpdated is Zero!")
+		b, err := proto.Marshal(&pb.ClientMessage{
+			Content: &pb.ClientMessage_WorldUpdate{},
+		})
+		if err != nil {
+			log.Fatalln(err)
+		}
+		mg.Client.Send <- b
+		mg.lastUpdated = time.Now()
+	}
 outer:
 	for {
 		select {
@@ -245,8 +258,14 @@ outer:
 			switch buf := msg.Content.(type) {
 			case *pb.ServerMessage_UpdateEntity:
 				mg.Chars.UpdateFromData(buf.UpdateEntity)
+			case *pb.ServerMessage_UpdateEntities:
+				for _, ue := range buf.UpdateEntities.UpdateEntity {
+					mg.Chars.UpdateFromData(ue)
+				}
 			case *pb.ServerMessage_GameStart:
 			case *pb.ServerMessage_PlayerDisconnected:
+				// maybe kill animation?
+				mg.Chars[buf.PlayerDisconnected.Id] = nil
 			default:
 				log.Printf("Unknown message type %T\n", buf)
 			}

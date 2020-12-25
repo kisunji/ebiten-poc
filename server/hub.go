@@ -33,6 +33,7 @@ func NewHub() *Hub {
 		clientData: make(chan clientData),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		AIChan:     make(chan AIData),
 	}
 }
 
@@ -144,11 +145,33 @@ func (h *Hub) Run() {
 					},
 				}
 				h.sendToAll(msg)
+			case *pb.ClientMessage_WorldUpdate:
+				updateAll := &pb.UpdateEntities{}
+				for i, char := range h.updater.world.Chars {
+					if char == nil {
+						continue
+					}
+					ue := &pb.UpdateEntity{
+						Index: int32(i),
+						Fx:    int32(char.Fx),
+						Fy:    int32(char.Fy),
+						Vx:    int32(char.Vx),
+						Vy:    int32(char.Vy),
+						Px:    char.Px,
+						Py:    char.Py,
+						Speed: int32(char.Speed),
+					}
+					updateAll.UpdateEntity = append(updateAll.UpdateEntity, ue)
+				}
+				h.sendToAll(&pb.ServerMessage{
+					Content: &pb.ServerMessage_UpdateEntities{
+						UpdateEntities: updateAll,
+					},
+				})
 			default:
 				h.disconnect(clientMsg.client)
 			}
 		case aiInput := <-h.AIChan:
-			log.Println("ai input got")
 			char := h.updater.world.Chars[aiInput.Id]
 			input := &pb.Input{
 				UpPressed:    aiInput.UpPressed,

@@ -22,7 +22,6 @@ func NewUpdater() *Updater {
 			Chars:       make(common.Chars, common.MaxChars),
 			tick:        0,
 			PlayerSlots: make([]bool, common.MaxClients),
-			aiChan:      make(chan AIData),
 			AIs:         make([]*AI,0),
 		},
 	}
@@ -37,7 +36,6 @@ type World struct {
 	PlayerSlots []bool
 	HostSlot    int32
 	AIs         []*AI
-	aiChan      chan AIData
 }
 
 func (w *World) Setup(aiChan chan AIData) {
