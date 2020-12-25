@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"log"
 	"net/http"
 
@@ -10,120 +9,147 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	ErrNoMoreClientSlots = errors.New("no more client slots")
-)
-
 type Hub struct {
-	clientSlots []bool
-
+	// game engine
+	updater *Updater
 	// Registered clients.
-	clients map[*Client]*common.Char
-
+	clients map[*Client]int32
 	// Inbound messages from the clients.
-	clientData chan Message
-
+	clientData chan clientData
 	// register requests from the clients.
 	register chan *Client
-
 	// Unregister requests from clients.
 	unregister chan *Client
-
-	AIChan chan AIData
+	// Inputs from AI.
+	AIChan    chan AIData
+	isRunning bool
 }
 
 // Create new chat hub.
 func NewHub() *Hub {
 	return &Hub{
-		clientSlots: make([]bool, common.MaxClients),
-		clientData:  make(chan Message),
-		register:    make(chan *Client),
-		unregister:  make(chan *Client),
-		clients:     make(map[*Client]*common.Char),
-		AIChan:      make(chan AIData),
+		updater:    NewUpdater(),
+		clients:    make(map[*Client]int32),
+		clientData: make(chan clientData),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
 	}
 }
 
 func (h *Hub) Run() {
+	h.isRunning = true
 	for {
 		select {
 		case client := <-h.register:
-			char := common.NewChar()
-			chars[client.clientSlot] = char
-			h.clients[client] = char
-			h.clientSlots[client.clientSlot] = true
+			clientSlot := h.getNextFreeClientSlot()
+			if clientSlot < 0 {
+				resp := &pb.ServerMessage{
+					Content: &pb.ServerMessage_ConnectError{
+						ConnectError: &pb.ConnectError{
+							Message: "all slots are full",
+						},
+					},
+				}
+				data, err := proto.Marshal(resp)
+				if err != nil {
+					log.Fatalln("client connect: marshaling error: ", err)
+				}
+				client.Send <- data
+				return
+			}
+			// state check (running already?)
+			if h.updater.world.Running {
+				resp := &pb.ServerMessage{
+					Content: &pb.ServerMessage_ConnectError{
+						ConnectError: &pb.ConnectError{
+							Message: "game is already running",
+						},
+					},
+				}
+				data, err := proto.Marshal(resp)
+				if err != nil {
+					log.Fatalln("client connect: marshaling error: ", err)
+				}
+				client.Send <- data
+				return
+			}
+			log.Printf("player %d connected\n", clientSlot)
+			client.clientSlot = clientSlot
+			if len(h.clients) == 0 {
+				h.updater.world.HostSlot = clientSlot
+			}
+			h.updater.world.PlayerSlots[clientSlot] = true
+			h.clients[client] = clientSlot
 
-			msg := pb.ConnectResponse{
-				ClientSlot: client.clientSlot,
-				Px:         char.Px,
-				Py:         char.Py,
+			resp := &pb.ServerMessage{
+				Content: &pb.ServerMessage_ConnectResponse{
+					ConnectResponse: &pb.ConnectResponse{
+						ClientSlot: client.clientSlot,
+						IsHost:     h.updater.world.HostSlot == clientSlot,
+					},
+				},
 			}
-			data, err := proto.Marshal(&msg)
+			data, err := proto.Marshal(resp)
 			if err != nil {
-				log.Println("client connect: marshaling error: ", err)
-				h.disconnect(client)
-				continue
+				log.Fatalln("client connect: marshaling error: ", err)
 			}
-			// Send to connecting player their information
-			client.Send <- pb.AddHeader(data, pb.MsgConnectResponse)
-			updateAll := &pb.UpdateAll{}
-			for i, char := range chars {
-				if char == nil {
-					continue
-				}
-				ue := &pb.UpdateEntity{
-					Index: int32(i),
-					Fx:    int32(char.Fx),
-					Fy:    int32(char.Fy),
-					Vx:    int32(char.Vx),
-					Vy:    int32(char.Vy),
-					Px:    char.Px,
-					Py:    char.Py,
-					Speed: int32(char.Speed),
-				}
-				updateAll.Updates = append(updateAll.Updates, ue)
+			client.Send <- data
+
+			resp = &pb.ServerMessage{
+				Content: &pb.ServerMessage_UpdateLobby{
+					UpdateLobby: &pb.UpdateLobby{
+						ConnectedSlots: h.updater.world.PlayerSlots,
+						HostSlot:       h.updater.world.HostSlot,
+					},
+				},
 			}
-			client.Send <- pb.AddHeader(data, pb.MsgUpdateAll)
+			h.sendToAll(resp)
 		case client := <-h.unregister:
 			h.disconnect(client)
-		case msg := <-h.clientData:
-			kind := pb.Kind(msg.data[0])
-			buf := msg.data[1:]
-			switch kind {
-			case pb.MsgPlayerInput:
-				pi := &pb.Input{}
-				err := proto.Unmarshal(buf, pi)
-				if err != nil {
-					log.Println(err)
-				}
+		case clientMsg := <-h.clientData:
+			msg := &pb.ClientMessage{}
+			err := proto.Unmarshal(clientMsg.data, msg)
+			if err != nil {
+				log.Println("error unmarshalling from client")
+			}
+			switch buf := msg.Content.(type) {
+			case *pb.ClientMessage_Input:
+				char := h.updater.world.Chars[clientMsg.client.clientSlot]
+				char.ProcessInput(buf.Input)
 
-				char := chars[msg.client.clientSlot]
-				char.ProcessInput(pi)
-
-				ue := &pb.UpdateEntity{
-					Index: msg.client.clientSlot,
-					Fx:    int32(char.Fx),
-					Fy:    int32(char.Fy),
-					Vx:    int32(char.Vx),
-					Vy:    int32(char.Vy),
-					Px:    char.Px,
-					Py:    char.Py,
-					Speed: int32(char.Speed),
+				resp := &pb.ServerMessage{
+					Content: &pb.ServerMessage_UpdateEntity{
+						UpdateEntity: &pb.UpdateEntity{
+							Index: clientMsg.client.clientSlot,
+							Fx:    int32(char.Fx),
+							Fy:    int32(char.Fy),
+							Vx:    int32(char.Vx),
+							Vy:    int32(char.Vy),
+							Px:    char.Px,
+							Py:    char.Py,
+							Speed: int32(char.Speed),
+						},
+					},
 				}
-				data, err := proto.Marshal(ue)
-				if err != nil {
-					log.Println("client connect: marshaling error: ", err)
-					continue
+				h.sendToAll(resp)
+			case *pb.ClientMessage_StartGame:
+				log.Println("starting!")
+				if !h.updater.world.Running {
+					h.updater.world.Setup(h.AIChan)
+					go h.updater.world.Run()
 				}
-
-				for c := range h.clients {
-					c.Send <- pb.AddHeader(data, pb.MsgUpdateEntity)
+				msg := &pb.ServerMessage{
+					Content: &pb.ServerMessage_GameStart{
+						GameStart: &pb.GameStart{},
+					},
 				}
+				h.sendToAll(msg)
 			default:
-				h.disconnect(msg.client)
+				h.disconnect(clientMsg.client)
 			}
 		case aiInput := <-h.AIChan:
-			char := chars[aiInput.Id]
+			log.Println("ai input got")
+			char := h.updater.world.Chars[aiInput.Id]
 			input := &pb.Input{
 				UpPressed:    aiInput.UpPressed,
 				DownPressed:  aiInput.DownPressed,
@@ -131,64 +157,96 @@ func (h *Hub) Run() {
 				RightPressed: aiInput.RightPressed,
 			}
 			if char == nil {
-				char = &common.Char{}
-				chars[aiInput.Id] = char
+				char = common.NewChar()
+				h.updater.world.Chars[aiInput.Id] = char
 			}
 			char.ProcessInput(input)
-			ue := &pb.UpdateEntity{
-				Index: aiInput.Id,
-				Fx:    int32(char.Fx),
-				Fy:    int32(char.Fy),
-				Vx:    int32(char.Vx),
-				Vy:    int32(char.Vy),
-				Px:    char.Px,
-				Py:    char.Py,
-				Speed: int32(char.Speed),
+			resp := &pb.ServerMessage{
+				Content: &pb.ServerMessage_UpdateEntity{
+					UpdateEntity: &pb.UpdateEntity{
+						Index: aiInput.Id,
+						Fx:    int32(char.Fx),
+						Fy:    int32(char.Fy),
+						Vx:    int32(char.Vx),
+						Vy:    int32(char.Vy),
+						Px:    char.Px,
+						Py:    char.Py,
+						Speed: int32(char.Speed),
+					},
+				},
 			}
-			data, err := proto.Marshal(ue)
-			if err != nil {
-				log.Println("client connect: marshaling error: ", err)
-				continue
-			}
-
-			for c := range h.clients {
-				c.Send <- pb.AddHeader(data, pb.MsgUpdateEntity)
-			}
+			h.sendToAll(resp)
 		}
+	}
+}
+
+func (h *Hub) sendToAll(msg *pb.ServerMessage) {
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		log.Println("client connect: marshaling error: ", err)
+	}
+	for c := range h.clients {
+		c.Send <- data
 	}
 }
 
 func (h *Hub) disconnect(client *Client) {
 	if _, ok := h.clients[client]; ok {
-		h.clientSlots[client.clientSlot] = false
-		client.Send <- []byte{byte(pb.MsgDisconnectPlayer)}
-		close(client.Send)
 		delete(h.clients, client)
+	}
+	if client.clientSlot >= 0 {
+		h.updater.world.PlayerSlots[client.clientSlot] = false
+		msg := &pb.ServerMessage{
+			Content: &pb.ServerMessage_PlayerDisconnected{
+				PlayerDisconnected: &pb.PlayerDisconnected{
+					Id: client.clientSlot,
+				},
+			},
+		}
+		h.sendToAll(msg)
+		log.Printf("player %d disconnected\n", client.clientSlot)
+	}
+	if h.updater.world.HostSlot == client.clientSlot {
+		for i, p := range h.updater.world.PlayerSlots {
+			if p {
+				msg := &pb.ServerMessage{
+					Content: &pb.ServerMessage_NewHost{
+						NewHost: &pb.NewHost{
+							Id: int32(i),
+						},
+					},
+				}
+				h.sendToAll(msg)
+				log.Printf("%d is new host\n", i)
+			}
+		}
+	}
+	if h.updater.world.Running && len(h.clients) == 0 {
+		log.Println("no clients found")
+		h.updater.world.Running = false
+		for _, ai := range h.updater.world.AIs {
+			ai.stop = true
+		}
+		h.updater = NewUpdater()
 	}
 }
 
-func (h *Hub) GetMaxClients() int { return len(h.clientSlots) }
-
 // serveWs handles websocket requests from the peer.
 func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
+	if !h.isRunning {
+		log.Fatal("hub is not running")
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	clientSlot, err := h.getNextFreeClientSlot()
-	if err != nil {
-		http.Error(w, "client slots full", 99)
-		return
-	}
-	log.Printf("slot %d connected\n", clientSlot)
 	client := &Client{
 		Hub:        h,
 		Conn:       conn,
-		clientSlot: clientSlot,
+		clientSlot: -1,
 		Send:       make(chan []byte, 256),
 	}
-	h.clientSlots[clientSlot] = true
 	client.Hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in
@@ -197,12 +255,11 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 	go client.ReadPump()
 }
 
-func (h *Hub) getNextFreeClientSlot() (int32, error) {
-	maxClients := h.GetMaxClients()
-	for i := 0; i < maxClients; i++ {
-		if !h.clientSlots[i] {
-			return int32(i), nil
+func (h *Hub) getNextFreeClientSlot() int32 {
+	for i := 0; i < common.MaxClients; i++ {
+		if !h.updater.world.PlayerSlots[i] {
+			return int32(i)
 		}
 	}
-	return 0, ErrNoMoreClientSlots
+	return -1
 }

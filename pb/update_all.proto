@@ -1,9 +1,0 @@
-syntax = "proto3";
-import "update_entity.proto";
-
-option go_package = "github.com/kisunji/ebiten-poc/pb";
-package pb;
-
-message UpdateAll {
-  repeated UpdateEntity Updates = 1;
-}

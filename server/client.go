@@ -36,7 +36,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type Message struct {
+type clientData struct {
 	client *Client
 	data   []byte
 }
@@ -44,13 +44,10 @@ type Message struct {
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
 	Hub *Hub
-
 	// The websocket connection.
 	Conn *websocket.Conn
-
 	// Buffered channel of outbound messages.
 	Send chan []byte
-
 	// Client slot
 	clientSlot int32
 }
@@ -87,14 +84,11 @@ func (c *Client) ReadPump() {
 			}
 			break
 		}
-		c.Hub.clientData <- Message{
+		c.Hub.clientData <- clientData{
 			client: c,
 			data:   buf,
 		}
 	}
-	c.Hub.unregister <- c
-	log.Printf("slot %d disconnected", c.clientSlot)
-	_ = c.Conn.Close()
 }
 
 // WritePump pumps messages from the Hub to the websocket connection.

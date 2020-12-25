@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"math"
 	"math/rand"
 	"time"
 
@@ -16,38 +17,29 @@ type AIData struct {
 	RightPressed bool
 }
 
-func NewAI(id int32) *AI {
-	char := common.NewChar()
-	chars[id] = char
-	ai := &AI{
-		Char:    char,
-		id:      id,
-		running: false,
-	}
-	return ai
-}
-
 type AI struct {
 	*common.Char
 
-	id      int32
-	running bool
+	id   int32
+	stop bool
 }
 
-func RunAI(ai *AI, hub *Hub) {
-	log.Printf("running ai %d", ai.id)
-	ai.running = true
+func (w *World) RunAI(ai *AI, aiChan chan AIData) {
 	rand.Seed(int64(time.Now().Nanosecond()))
 	for {
-		if !ai.running {
-			log.Printf("killed ai %d", ai.id)
+		if ai.stop {
 			break
 		}
+		if !w.Running {
+			time.Sleep(time.Second)
+			continue
+		}
 		time.Sleep(time.Duration(rand.Intn(10000)) * time.Millisecond)
-		hub.AIChan <- computeMovement(ai)
+		w.aiChan <- computeMovement(ai)
 		// move for up to 5 seconds
 		time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
-		hub.AIChan <- AIData{
+		// wait
+		aiChan <- AIData{
 			Id:           ai.id,
 			UpPressed:    false,
 			DownPressed:  false,
@@ -55,19 +47,19 @@ func RunAI(ai *AI, hub *Hub) {
 			RightPressed: false,
 		}
 	}
+	log.Printf("stopping ai %d\n", ai.id)
 }
-
 func computeMovement(ai *AI) AIData {
 	biasx := ai.Px/float64(common.ScreenWidth) - .5
 	biasy := ai.Py/float64(common.ScreenHeight) - .5
 	fx := 0
-	if rawx := rand.NormFloat64() - biasx; rawx < 0 {
+	if rawx := math.Round(rand.NormFloat64() - biasx); rawx < 0 {
 		fx = -1
 	} else if rawx > 0 {
 		fx = 1
 	}
 	fy := 0
-	if rawy := rand.NormFloat64() - biasy; rawy < 0 {
+	if rawy := math.Round(rand.NormFloat64() - biasy); rawy < 0 {
 		fy = -1
 	} else if rawy > 0 {
 		fy = 1

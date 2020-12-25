@@ -10,21 +10,23 @@ import (
 
 func NewChar() *Char {
 	return &Char{
-		Fx:    1,
-		Fy:    1,
-		Px:    float64(ScreenPadding + rand.Intn(ScreenWidth-ScreenPadding*3)),
-		Py:    float64(ScreenPadding + rand.Intn(ScreenHeight-ScreenPadding*3)),
-		Speed: 1,
+		Fx:     1,
+		Fy:     1,
+		Px:     float64(ScreenPadding + rand.Intn(ScreenWidth-ScreenPadding*3)),
+		Py:     float64(ScreenPadding + rand.Intn(ScreenHeight-ScreenPadding*3)),
+		Speed:  1,
+		Offset: rand.Intn(10),
 	}
 }
 
 func NewCharAt(px, py float64) *Char {
 	return &Char{
-		Fx:    1,
-		Fy:    1,
-		Px:    px,
-		Py:    py,
-		Speed: 1,
+		Fx:     1,
+		Fy:     1,
+		Px:     px,
+		Py:     py,
+		Speed:  1,
+		Offset: rand.Intn(10),
 	}
 }
 
@@ -33,6 +35,7 @@ type Char struct {
 	Vx, Vy int     // velocity
 	Px, Py float64 // position
 	Speed  int
+	Offset int // animation offset
 
 	// used by server only
 	lastUpdatedTimer time.Time
@@ -43,7 +46,7 @@ type Chars []*Char
 func (cc Chars) UpdateFromData(input *pb.UpdateEntity) {
 	c := cc[input.Index]
 	if c == nil {
-		c = &Char{}
+		c = NewChar()
 		cc[input.Index] = c
 	}
 	c.Px = input.Px

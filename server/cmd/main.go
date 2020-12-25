@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/kisunji/ebiten-poc/common"
 	"github.com/kisunji/ebiten-poc/server"
 )
 
@@ -17,15 +16,8 @@ var key = flag.String("key", "", "path to key file")
 func main() {
 	flag.Parse()
 
-	go server.Run()
-
 	hub := server.NewHub()
 	go hub.Run()
-
-	for i := common.MaxClients; i < common.MaxChars; i++ {
-		id := i
-		go server.RunAI(server.NewAI(int32(id)), hub)
-	}
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		hub.ServeWs(w, r)
