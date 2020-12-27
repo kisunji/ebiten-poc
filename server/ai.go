@@ -25,19 +25,23 @@ type AI struct {
 }
 
 func (w *World) RunAI(ai *AI, aiChan chan AIData) {
-	rand.Seed(int64(time.Now().Nanosecond()))
 	for {
 		if ai.stop {
 			break
 		}
-		if !w.Running {
-			time.Sleep(time.Second)
-			continue
+		time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
+		if ai.stop {
+			break
 		}
-		time.Sleep(time.Duration(rand.Intn(10000)) * time.Millisecond)
 		aiChan <- computeMovement(ai)
+		if ai.stop {
+			break
+		}
 		// move for up to 5 seconds
 		time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
+		if ai.stop {
+			break
+		}
 		// wait
 		aiChan <- AIData{
 			Id:           ai.id,
@@ -49,27 +53,21 @@ func (w *World) RunAI(ai *AI, aiChan chan AIData) {
 	}
 	log.Printf("stopping ai %d\n", ai.id)
 }
+
 func computeMovement(ai *AI) AIData {
-	biasx := ai.Px/float64(common.ScreenWidth) - .5
-	biasy := ai.Py/float64(common.ScreenHeight) - .5
-	fx := 0
-	if rawx := math.Round(rand.NormFloat64() - biasx); rawx < 0 {
-		fx = -1
-	} else if rawx > 0 {
-		fx = 1
-	}
-	fy := 0
-	if rawy := math.Round(rand.NormFloat64() - biasy); rawy < 0 {
-		fy = -1
-	} else if rawy > 0 {
-		fy = 1
+	aiData := AIData{Id: ai.id}
+	biasx := (ai.Px/float64(common.ScreenWidth) - .5) * 2
+	biasy := (ai.Py/float64(common.ScreenHeight) - .5) * 2
+	if x := math.Round(rand.NormFloat64()*.5 - biasx); x < 0 {
+		aiData.LeftPressed = true
+	} else if x > 0 {
+		aiData.RightPressed = true
 	}
 
-	return AIData{
-		Id:           ai.id,
-		UpPressed:    fy == -1,
-		DownPressed:  fy == 1,
-		LeftPressed:  fx == -1,
-		RightPressed: fx == 1,
+	if y := math.Round(rand.NormFloat64()*.5 - biasy); y < 0 {
+		aiData.UpPressed = true
+	} else if y > 0 {
+		aiData.DownPressed = true
 	}
+	return aiData
 }

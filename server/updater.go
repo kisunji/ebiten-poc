@@ -2,32 +2,28 @@ package server
 
 import (
 	"log"
+	"math"
 	"time"
 
 	"github.com/kisunji/ebiten-poc/common"
+	"github.com/kisunji/ebiten-poc/pb"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
 	updateFrequency = 1 * time.Second / 60
 )
 
-type Updater struct {
-	world *World
-}
-
-func NewUpdater() *Updater {
-	return &Updater{
-		world: &World{
-			Running:     false,
-			Chars:       make(common.Chars, common.MaxChars),
-			tick:        0,
-			PlayerSlots: make([]bool, common.MaxClients),
-			AIs:         make([]*AI,0),
-		},
+func NewWorld(broadcast chan []byte) *World {
+	return &World{
+		Running:     false,
+		Chars:       make(common.Chars, common.MaxChars),
+		tick:        0,
+		PlayerSlots: make([]bool, common.MaxClients),
+		AIs:         make([]*AI, 0),
+		broadcast:   broadcast,
 	}
 }
-
-type State int
 
 type World struct {
 	Running     bool
@@ -36,6 +32,7 @@ type World struct {
 	PlayerSlots []bool
 	HostSlot    int32
 	AIs         []*AI
+	broadcast   chan []byte
 }
 
 func (w *World) Setup(aiChan chan AIData) {
@@ -76,9 +73,55 @@ func (w *World) Run() {
 }
 
 func (w *World) update() {
-	for _, char := range w.Chars {
-		if char == nil {
+	for i, char := range w.Chars {
+		if char == nil || char.IsDead {
 			continue
+		}
+		if char.Attacking() {
+			log.Println("attacking", i)
+			char.Attack()
+			// reached end of animation
+			if !char.Attacking() {
+				const radius = 12.0
+				x0, y0 := char.ImpactSite(radius)
+				for j, isPlayer := range w.PlayerSlots {
+					if !isPlayer || i == j {
+						continue
+					}
+					log.Println("slot is player", j)
+					target := w.Chars[j]
+					if target.IsDead {
+						continue
+					}
+					x1 := target.Px
+					y1 := target.Py
+					dx := x1 - x0
+					dy := y1 - y0
+					distance := math.Sqrt(math.Pow(dx, 2) + math.Pow(dy, 2))
+					if distance <= radius {
+						log.Println("target is dead", j)
+						target.IsDead = true
+						ue := &pb.ServerMessage{
+							Content: &pb.ServerMessage_UpdateEntity{
+								UpdateEntity: &pb.UpdateEntity{
+									Index:  int32(j),
+									Fx:     int32(target.Fx),
+									Fy:     int32(target.Fy),
+									Px:     target.Px,
+									Py:     target.Py,
+									Speed:  int32(target.Speed),
+									IsDead: true,
+								},
+							},
+						}
+						data, err := proto.Marshal(ue)
+						if err != nil {
+							log.Fatalln("client connect: marshaling error: ", err)
+						}
+						w.broadcast <- data
+					}
+				}
+			}
 		}
 		char.Move()
 	}

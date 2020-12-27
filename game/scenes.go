@@ -133,8 +133,8 @@ func NewLobby(c *Client) *Lobby {
 func (l *Lobby) Update() {
 	l.startText = "START"
 	x, y := ebiten.CursorPosition()
-	if x > common.ScreenWidth-50 && x < common.ScreenWidth &&
-		y > common.ScreenHeight-50 && y < common.ScreenHeight {
+	if x > common.ScreenWidth-120 && x < common.ScreenWidth-30 &&
+		y > common.ScreenHeight-46 && y < common.ScreenHeight-30 {
 		l.startText = ">START"
 		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 			l.startText = ">START"
@@ -215,7 +215,7 @@ func (l *Lobby) Draw(screen *ebiten.Image) {
 		text.Draw(screen, s, smallFont, 45, common.ScreenHeight/2+i*18, color.White)
 	}
 	if l.hostId == l.yourId {
-		text.Draw(screen, l.startText, smallFont, common.ScreenWidth-50, common.ScreenHeight-50, color.White)
+		text.Draw(screen, l.startText, smallFont, common.ScreenWidth-120, common.ScreenHeight-30, color.White)
 	}
 }
 
@@ -232,11 +232,22 @@ type MainGame struct {
 	next        Scene
 	Op          *ebiten.DrawImageOptions
 	lastUpdated time.Time
+	debouncer   *Debouncer
+}
+
+func NewMainGame(c *Client, d *Debouncer) *MainGame {
+	return &MainGame{
+		Op:        &ebiten.DrawImageOptions{},
+		Speed:     5,
+		Client:    c,
+		Chars:     make([]*common.Char, common.MaxChars),
+		next:      SceneMainGame,
+		debouncer: d,
+	}
 }
 
 func (mg *MainGame) Update() {
 	if mg.lastUpdated.IsZero() {
-		log.Println("lastUpdated is Zero!")
 		b, err := proto.Marshal(&pb.ClientMessage{
 			Content: &pb.ClientMessage_WorldUpdate{},
 		})
@@ -278,11 +289,13 @@ outer:
 			break outer
 		}
 	}
-
 	mg.parseInput()
 	for _, char := range mg.Chars {
 		if char == nil {
 			continue
+		}
+		if char.Attacking() {
+			char.Attack()
 		}
 		char.Move()
 	}
@@ -292,28 +305,33 @@ outer:
 func (mg *MainGame) parseInput() {
 	var pi pb.Input
 	var inputChanged bool
-	if ebiten.IsKeyPressed(ebiten.KeyD) || rightTouched() {
+	if ebiten.IsKeyPressed(ebiten.KeyD) || ebiten.IsKeyPressed(ebiten.KeyRight) || rightTouched() {
 		pi.RightPressed = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) || leftTouched() {
+	if ebiten.IsKeyPressed(ebiten.KeyA) || ebiten.IsKeyPressed(ebiten.KeyLeft) || leftTouched() {
 		pi.LeftPressed = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyW) || upTouched() {
+	if ebiten.IsKeyPressed(ebiten.KeyW) || ebiten.IsKeyPressed(ebiten.KeyUp) || upTouched() {
 		pi.UpPressed = true
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) || downTouched() {
+	if ebiten.IsKeyPressed(ebiten.KeyS) || ebiten.IsKeyPressed(ebiten.KeyDown) || downTouched() {
 		pi.DownPressed = true
+	}
+	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		pi.ActionPressed = true
 	}
 	if mg.input.RightPressed != pi.RightPressed ||
 		mg.input.LeftPressed != pi.LeftPressed ||
 		mg.input.UpPressed != pi.UpPressed ||
-		mg.input.DownPressed != pi.DownPressed {
+		mg.input.DownPressed != pi.DownPressed  ||
+		mg.input.ActionPressed != pi.ActionPressed {
 		inputChanged = true
 	}
 	mg.input.RightPressed = pi.RightPressed
 	mg.input.LeftPressed = pi.LeftPressed
 	mg.input.UpPressed = pi.UpPressed
 	mg.input.DownPressed = pi.DownPressed
+	mg.input.ActionPressed = pi.ActionPressed
 	if !inputChanged {
 		return
 	}
@@ -325,39 +343,96 @@ func (mg *MainGame) parseInput() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	mg.Client.Send <- b
+	mg.debouncer.input <- b
 }
 
-func (mg MainGame) Draw(screen *ebiten.Image) {
+func (mg *MainGame) Draw(screen *ebiten.Image) {
 	tmp := make([]*common.Char, len(mg.Chars))
 	copy(tmp, mg.Chars)
 	sort.Slice(tmp, func(i, j int) bool {
 		if tmp[i] == nil || tmp[j] == nil {
 			return true
 		}
-		return tmp[i].Py < tmp[j].Py
+		return tmp[i].IsDead || tmp[i].Py < tmp[j].Py
 	})
 	for _, char := range tmp {
 		if char == nil {
 			continue
 		}
-		sprite := runnerWaitingFrame
-		if char.Vx != 0 || char.Vy != 0 {
-			sprite = runnerWalkingFrame
+		if char.IsDead {
+			sprite := deadFrame()
+			w, h := sprite.Size()
+			mg.Op.GeoM.Reset()
+			if char.Fx < 0 {
+				mg.Op.GeoM.Scale(-1, 1)
+				mg.Op.GeoM.Translate(float64(w), 0)
+			}
+			mg.Op.GeoM.Translate(
+				char.Px-float64(w)/2,
+				char.Py-float64(h)/2,
+			)
+			screen.DrawImage(sprite, mg.Op)
+			continue
 		}
+		// fallback sprite if (fx,fy) = (0,0)
+		sprite := downRestingFrame(0)
+		clock := mg.count/mg.Speed + char.Offset
+		if char.Vx == 0 && char.Vy == 0 {
+			clock = 0
+		}
+		if char.Fx != 0 {
+			if char.Fy < 0 {
+				if char.Attacking() {
+					sprite = upRightAttackingFrame(char.AttackFrame)
+				} else {
+					sprite = upRightRestingFrame(clock)
+				}
+			}
+			if char.Fy > 0 {
+				if char.Attacking() {
+					sprite = downRightAttackingFrame(char.AttackFrame)
+				} else {
+					sprite = downRightRestingFrame(clock)
+				}
+			}
+			if char.Fy == 0 {
+				if char.Attacking() {
+					sprite = rightAttackingFrame(char.AttackFrame)
+				} else {
+					sprite = rightRestingFrame(clock)
+				}
+			}
+		} else {
+			if char.Fy < 0 {
+				if char.Attacking() {
+					sprite = upAttackingFrame(char.AttackFrame)
+				} else {
+					sprite = upRestingFrame(clock)
+				}
+			}
+			if char.Fy > 0 {
+				if char.Attacking() {
+					sprite = downAttackingFrame(char.AttackFrame)
+				} else {
+					sprite = downRestingFrame(clock)
+				}
+			}
+		}
+
+		w, h := sprite.Size()
 		mg.Op.GeoM.Reset()
 		if char.Fx < 0 {
 			mg.Op.GeoM.Scale(-1, 1)
-			mg.Op.GeoM.Translate(frameWidth, 0)
+			mg.Op.GeoM.Translate(float64(w), 0)
 		}
 		mg.Op.GeoM.Translate(
-			char.Px-frameWidth/2,
-			char.Py-frameHeight/2,
+			char.Px-float64(w)/2,
+			char.Py-float64(h)/2,
 		)
-		screen.DrawImage(sprite(mg.count/mg.Speed+char.Offset), mg.Op)
+		screen.DrawImage(sprite, mg.Op)
 	}
 }
 
-func (mg MainGame) Next() Scene {
-	return SceneMainGame
+func (mg *MainGame) Next() Scene {
+	return mg.next
 }

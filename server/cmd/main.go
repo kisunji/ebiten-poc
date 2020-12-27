@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/kisunji/ebiten-poc/server"
 )
@@ -15,6 +17,8 @@ var key = flag.String("key", "", "path to key file")
 
 func main() {
 	flag.Parse()
+
+	rand.Seed(time.Now().UnixNano())
 
 	hub := server.NewHub()
 	go hub.Run()

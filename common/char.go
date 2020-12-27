@@ -8,37 +8,28 @@ import (
 	"github.com/kisunji/ebiten-poc/pb"
 )
 
+type Char struct {
+	Fx, Fy      int     // facing
+	Vx, Vy      int     // velocity
+	Px, Py      float64 // position
+	Speed       int
+	Offset      int // animation offset
+	AttackFrame int
+	IsDead      bool
+
+	// used by server only
+	lastUpdatedTimer time.Time
+}
+
 func NewChar() *Char {
 	return &Char{
-		Fx:     1,
-		Fy:     1,
+		Fx:     rand.Intn(2) - 1,
+		Fy:     rand.Intn(2) - 1,
 		Px:     float64(ScreenPadding + rand.Intn(ScreenWidth-ScreenPadding*3)),
 		Py:     float64(ScreenPadding + rand.Intn(ScreenHeight-ScreenPadding*3)),
 		Speed:  1,
 		Offset: rand.Intn(10),
 	}
-}
-
-func NewCharAt(px, py float64) *Char {
-	return &Char{
-		Fx:     1,
-		Fy:     1,
-		Px:     px,
-		Py:     py,
-		Speed:  1,
-		Offset: rand.Intn(10),
-	}
-}
-
-type Char struct {
-	Fx, Fy int     // facing
-	Vx, Vy int     // velocity
-	Px, Py float64 // position
-	Speed  int
-	Offset int // animation offset
-
-	// used by server only
-	lastUpdatedTimer time.Time
 }
 
 type Chars []*Char
@@ -56,23 +47,29 @@ func (cc Chars) UpdateFromData(input *pb.UpdateEntity) {
 	c.Vx = int(input.Vx)
 	c.Vy = int(input.Vy)
 	c.Speed = int(input.Speed)
+	c.AttackFrame = int(input.AttackFrame)
+	c.IsDead = input.IsDead
 }
 
 func (c *Char) ProcessInput(input *pb.Input) {
+	c.Vx = 0
+	c.Vy = 0
+	if input.ActionPressed {
+		c.Attack()
+		return
+	}
 	if input.RightPressed {
-		c.Fx = 1
+		c.Vx = 1
 	}
 	if input.LeftPressed {
-		c.Fx = -1
+		c.Vx = -1
 	}
 	if input.UpPressed {
-		c.Fy = -1
+		c.Vy = -1
 	}
 	if input.DownPressed {
-		c.Fy = 1
+		c.Vy = 1
 	}
-	c.Vx = c.Fx * c.Speed
-	c.Vy = c.Fy * c.Speed
 	if input.RightPressed == input.LeftPressed {
 		c.Vx = 0
 	}
@@ -82,7 +79,26 @@ func (c *Char) ProcessInput(input *pb.Input) {
 	c.lastUpdatedTimer = time.Now()
 }
 
+// Attack sets decrements attackFrame
+func (c *Char) Attack() {
+	if c.AttackFrame == 0 {
+		c.AttackFrame = 20
+		return
+	}
+	c.AttackFrame--
+}
+
+func (c *Char) Attacking() bool {
+	return c.AttackFrame > 0
+}
+
 func (c *Char) Move() {
+	if c.IsDead {
+		return
+	}
+	if c.Vx == 0 && c.Vy == 0 {
+		return
+	}
 	normalized := math.Sqrt(math.Pow(float64(c.Vx), 2) + math.Pow(float64(c.Vy), 2))
 	if normalized == 0 {
 		return
@@ -101,4 +117,28 @@ func (c *Char) Move() {
 	if c.Py <= ScreenPadding {
 		c.Py = ScreenPadding + 1
 	}
+	if c.Vx > 0 {
+		c.Fx = 1
+	} else if c.Vx < 0 {
+		c.Fx = -1
+	} else {
+		c.Fx = 0
+	}
+	if c.Vy > 0 {
+		c.Fy = 1
+	} else if c.Vy < 0 {
+		c.Fy = -1
+	} else {
+		c.Fy = 0
+	}
+}
+
+func (c *Char) ImpactSite(radius float64) (x, y float64) {
+	normalized := math.Sqrt(math.Pow(float64(c.Fx), 2) + math.Pow(float64(c.Fy), 2))
+	if normalized == 0 {
+		return
+	}
+	x = c.Px + float64(c.Fx)*radius/normalized
+	y = c.Py + float64(c.Fy)*radius/normalized
+	return x, y
 }

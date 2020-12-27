@@ -13,7 +13,7 @@ const (
 	pingPeriod = 5 * time.Second
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 2048
+	// maxMessageSize = 2048
 )
 
 type Client struct {
@@ -33,7 +33,6 @@ func NewClient() *Client {
 	return &Client{
 		Recv:       make(chan []byte, 256),
 		Disconnect: make(chan bool),
-		conn:       nil,
 		Send:       make(chan []byte, 256),
 	}
 }
@@ -79,7 +78,7 @@ func (c *Client) readPump(ctx context.Context) {
 		c.conn.Close(websocket.StatusInternalError, "unexpected close")
 		c.Disconnect <- true
 	}()
-	c.conn.SetReadLimit(maxMessageSize)
+	// c.conn.SetReadLimit(maxMessageSize)
 	for {
 		_, buf, err := c.conn.Read(ctx)
 		if err != nil {

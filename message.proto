@@ -1,0 +1,77 @@
+syntax = "proto3";
+option go_package = "github.com/kisunji/ebiten-poc/pb";
+package pb;
+
+message ClientMessage {
+  oneof content {
+    Input input = 1;
+    StartGame startGame = 2;
+    WorldUpdate worldUpdate = 3;
+  }
+}
+
+message Input {
+  bool UpPressed = 1;
+  bool DownPressed = 2;
+  bool LeftPressed = 3;
+  bool RightPressed = 4;
+  bool ActionPressed = 5;
+}
+
+message StartGame {}
+
+message WorldUpdate {}
+
+message ServerMessage {
+  oneof content {
+    ConnectResponse connectResponse = 1;
+    ConnectError connectError = 2;
+    UpdateLobby updateLobby = 3;
+    GameStart gameStart = 4;
+    UpdateEntity updateEntity = 5;
+    PlayerDisconnected playerDisconnected = 6;
+    NewHost newHost = 7;
+    UpdateEntities updateEntities = 8;
+  }
+}
+
+message ConnectResponse {
+  int32 clientSlot = 1;
+  bool isHost = 2;
+}
+
+message ConnectError {
+  string message = 1;
+}
+
+message PlayerDisconnected {
+  int32 id = 1;
+}
+
+message NewHost {
+  int32 id = 1;
+}
+
+message UpdateLobby {
+  repeated bool connectedSlots = 1;
+  int32 hostSlot = 2;
+}
+
+message GameStart {}
+
+message UpdateEntity {
+  int32 index = 1;
+  int32 Fx = 2;
+  int32 Fy = 3;
+  int32 vx = 4;
+  int32 vy = 5;
+  double Px = 6;
+  double Py = 7;
+  int32 speed = 8;
+  int32 attackFrame = 9;
+  bool isDead = 10;
+}
+
+message UpdateEntities {
+  repeated UpdateEntity updateEntity = 1;
+}

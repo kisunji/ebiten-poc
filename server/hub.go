@@ -11,7 +11,7 @@ import (
 
 type Hub struct {
 	// game engine
-	updater *Updater
+	world *World
 	// Registered clients.
 	clients map[*Client]int32
 	// Inbound messages from the clients.
@@ -20,6 +20,8 @@ type Hub struct {
 	register chan *Client
 	// Unregister requests from clients.
 	unregister chan *Client
+	// broadcast messages to all clients
+	broadcast chan []byte
 	// Inputs from AI.
 	AIChan    chan AIData
 	isRunning bool
@@ -27,13 +29,15 @@ type Hub struct {
 
 // Create new chat hub.
 func NewHub() *Hub {
+	broadcast := make(chan []byte)
 	return &Hub{
-		updater:    NewUpdater(),
+		world:      NewWorld(broadcast),
 		clients:    make(map[*Client]int32),
 		clientData: make(chan clientData),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		AIChan:     make(chan AIData),
+		broadcast:  broadcast,
 	}
 }
 
@@ -59,7 +63,7 @@ func (h *Hub) Run() {
 				return
 			}
 			// state check (running already?)
-			if h.updater.world.Running {
+			if h.world.Running {
 				resp := &pb.ServerMessage{
 					Content: &pb.ServerMessage_ConnectError{
 						ConnectError: &pb.ConnectError{
@@ -77,16 +81,16 @@ func (h *Hub) Run() {
 			log.Printf("player %d connected\n", clientSlot)
 			client.clientSlot = clientSlot
 			if len(h.clients) == 0 {
-				h.updater.world.HostSlot = clientSlot
+				h.world.HostSlot = clientSlot
 			}
-			h.updater.world.PlayerSlots[clientSlot] = true
+			h.world.PlayerSlots[clientSlot] = true
 			h.clients[client] = clientSlot
 
 			resp := &pb.ServerMessage{
 				Content: &pb.ServerMessage_ConnectResponse{
 					ConnectResponse: &pb.ConnectResponse{
 						ClientSlot: client.clientSlot,
-						IsHost:     h.updater.world.HostSlot == clientSlot,
+						IsHost:     h.world.HostSlot == clientSlot,
 					},
 				},
 			}
@@ -99,8 +103,8 @@ func (h *Hub) Run() {
 			resp = &pb.ServerMessage{
 				Content: &pb.ServerMessage_UpdateLobby{
 					UpdateLobby: &pb.UpdateLobby{
-						ConnectedSlots: h.updater.world.PlayerSlots,
-						HostSlot:       h.updater.world.HostSlot,
+						ConnectedSlots: h.world.PlayerSlots,
+						HostSlot:       h.world.HostSlot,
 					},
 				},
 			}
@@ -115,51 +119,55 @@ func (h *Hub) Run() {
 			}
 			switch buf := msg.Content.(type) {
 			case *pb.ClientMessage_Input:
-				char := h.updater.world.Chars[clientMsg.client.clientSlot]
+				char := h.world.Chars[clientMsg.client.clientSlot]
 				char.ProcessInput(buf.Input)
 
 				resp := &pb.ServerMessage{
 					Content: &pb.ServerMessage_UpdateEntity{
 						UpdateEntity: &pb.UpdateEntity{
-							Index: clientMsg.client.clientSlot,
-							Fx:    int32(char.Fx),
-							Fy:    int32(char.Fy),
-							Vx:    int32(char.Vx),
-							Vy:    int32(char.Vy),
-							Px:    char.Px,
-							Py:    char.Py,
-							Speed: int32(char.Speed),
+							Index:       clientMsg.client.clientSlot,
+							Fx:          int32(char.Fx),
+							Fy:          int32(char.Fy),
+							Vx:          int32(char.Vx),
+							Vy:          int32(char.Vy),
+							Px:          char.Px,
+							Py:          char.Py,
+							Speed:       int32(char.Speed),
+							AttackFrame: int32(char.AttackFrame),
+							IsDead:      char.IsDead,
 						},
 					},
 				}
 				h.sendToAll(resp)
 			case *pb.ClientMessage_StartGame:
 				log.Println("starting!")
-				if !h.updater.world.Running {
-					h.updater.world.Setup(h.AIChan)
-					go h.updater.world.Run()
-				}
 				msg := &pb.ServerMessage{
 					Content: &pb.ServerMessage_GameStart{
 						GameStart: &pb.GameStart{},
 					},
 				}
 				h.sendToAll(msg)
+				if !h.world.Running {
+					h.world.Setup(h.AIChan)
+					go h.world.Run()
+				}
 			case *pb.ClientMessage_WorldUpdate:
 				updateAll := &pb.UpdateEntities{}
-				for i, char := range h.updater.world.Chars {
+				for i, char := range h.world.Chars {
 					if char == nil {
 						continue
 					}
 					ue := &pb.UpdateEntity{
-						Index: int32(i),
-						Fx:    int32(char.Fx),
-						Fy:    int32(char.Fy),
-						Vx:    int32(char.Vx),
-						Vy:    int32(char.Vy),
-						Px:    char.Px,
-						Py:    char.Py,
-						Speed: int32(char.Speed),
+						Index:       int32(i),
+						Fx:          int32(char.Fx),
+						Fy:          int32(char.Fy),
+						Vx:          int32(char.Vx),
+						Vy:          int32(char.Vy),
+						Px:          char.Px,
+						Py:          char.Py,
+						Speed:       int32(char.Speed),
+						AttackFrame: int32(char.AttackFrame),
+						IsDead:      char.IsDead,
 					}
 					updateAll.UpdateEntity = append(updateAll.UpdateEntity, ue)
 				}
@@ -172,7 +180,7 @@ func (h *Hub) Run() {
 				h.disconnect(clientMsg.client)
 			}
 		case aiInput := <-h.AIChan:
-			char := h.updater.world.Chars[aiInput.Id]
+			char := h.world.Chars[aiInput.Id]
 			input := &pb.Input{
 				UpPressed:    aiInput.UpPressed,
 				DownPressed:  aiInput.DownPressed,
@@ -181,7 +189,7 @@ func (h *Hub) Run() {
 			}
 			if char == nil {
 				char = common.NewChar()
-				h.updater.world.Chars[aiInput.Id] = char
+				h.world.Chars[aiInput.Id] = char
 			}
 			char.ProcessInput(input)
 			resp := &pb.ServerMessage{
@@ -199,6 +207,11 @@ func (h *Hub) Run() {
 				},
 			}
 			h.sendToAll(resp)
+		case data := <-h.broadcast:
+			log.Println("got data!")
+			for c := range h.clients {
+				c.Send <- data
+			}
 		}
 	}
 }
@@ -218,7 +231,7 @@ func (h *Hub) disconnect(client *Client) {
 		delete(h.clients, client)
 	}
 	if client.clientSlot >= 0 {
-		h.updater.world.PlayerSlots[client.clientSlot] = false
+		h.world.PlayerSlots[client.clientSlot] = false
 		msg := &pb.ServerMessage{
 			Content: &pb.ServerMessage_PlayerDisconnected{
 				PlayerDisconnected: &pb.PlayerDisconnected{
@@ -229,8 +242,8 @@ func (h *Hub) disconnect(client *Client) {
 		h.sendToAll(msg)
 		log.Printf("player %d disconnected\n", client.clientSlot)
 	}
-	if h.updater.world.HostSlot == client.clientSlot {
-		for i, p := range h.updater.world.PlayerSlots {
+	if h.world.HostSlot == client.clientSlot {
+		for i, p := range h.world.PlayerSlots {
 			if p {
 				msg := &pb.ServerMessage{
 					Content: &pb.ServerMessage_NewHost{
@@ -244,13 +257,13 @@ func (h *Hub) disconnect(client *Client) {
 			}
 		}
 	}
-	if h.updater.world.Running && len(h.clients) == 0 {
+	if h.world.Running && len(h.clients) == 0 {
 		log.Println("no clients found")
-		h.updater.world.Running = false
-		for _, ai := range h.updater.world.AIs {
+		h.world.Running = false
+		for _, ai := range h.world.AIs {
 			ai.stop = true
 		}
-		h.updater = NewUpdater()
+		h.world = NewWorld(h.broadcast)
 	}
 }
 
@@ -280,7 +293,7 @@ func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request) {
 
 func (h *Hub) getNextFreeClientSlot() int32 {
 	for i := 0; i < common.MaxClients; i++ {
-		if !h.updater.world.PlayerSlots[i] {
+		if !h.world.PlayerSlots[i] {
 			return int32(i)
 		}
 	}

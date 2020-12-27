@@ -1,24 +1,13 @@
 package game
 
 import (
-	"bytes"
 	"fmt"
-	"image"
-	"log"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 	"github.com/kisunji/ebiten-poc/common"
 )
-
-func init() {
-	img, _, err := image.Decode(bytes.NewReader(images.Runner_png))
-	if err != nil {
-		log.Fatal(err)
-	}
-	runnerImage = ebiten.NewImageFromImage(img)
-}
 
 type Scene int
 
@@ -46,16 +35,18 @@ type input struct {
 }
 
 func (g *Game) init() {
+	d := &Debouncer{
+		input:    make(chan []byte),
+		output:   g.Client.Send,
+		duration: 33 * time.Millisecond,
+		running:  false,
+	}
+	go d.debounce()
 	g.SceneHandlers = map[Scene]SceneHandler{
 		SceneStartMenu:    &StartMenu{client: g.Client},
 		SceneNotConnected: &NotConnected{},
 		SceneLobby:        NewLobby(g.Client),
-		SceneMainGame: &MainGame{
-			Op:     &ebiten.DrawImageOptions{},
-			Speed:  5,
-			Client: g.Client,
-			Chars:  make([]*common.Char, common.MaxChars),
-		},
+		SceneMainGame:     NewMainGame(g.Client, d),
 	}
 	g.inited = true
 }
@@ -69,9 +60,6 @@ func (g *Game) Update() error {
 		handler := g.SceneHandlers[g.Scene]
 		handler.Update()
 		g.Scene = handler.Next()
-		if g.Scene != SceneStartMenu {
-
-		}
 	case SceneLobby:
 		handler := g.SceneHandlers[g.Scene]
 		handler.Update()
@@ -84,12 +72,18 @@ func (g *Game) Update() error {
 		handler := g.SceneHandlers[g.Scene]
 		handler.Update()
 		g.Scene = handler.Next()
-
 	}
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	// screen.Fill(color.RGBA{
+	// 	R: 82,
+	// 	G: 81,
+	// 	B: 82,
+	// 	A: 255,
+	// })
+
 	switch g.Scene {
 	case SceneStartMenu:
 		g.SceneHandlers[g.Scene].Draw(screen)
