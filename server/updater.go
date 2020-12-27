@@ -78,7 +78,6 @@ func (w *World) update() {
 			continue
 		}
 		if char.Attacking() {
-			log.Println("attacking", i)
 			char.Attack()
 			// reached end of animation
 			if !char.Attacking() {
@@ -88,7 +87,6 @@ func (w *World) update() {
 					if !isPlayer || i == j {
 						continue
 					}
-					log.Println("slot is player", j)
 					target := w.Chars[j]
 					if target.IsDead {
 						continue
@@ -99,7 +97,6 @@ func (w *World) update() {
 					dy := y1 - y0
 					distance := math.Sqrt(math.Pow(dx, 2) + math.Pow(dy, 2))
 					if distance <= radius {
-						log.Println("target is dead", j)
 						target.IsDead = true
 						ue := &pb.ServerMessage{
 							Content: &pb.ServerMessage_UpdateEntity{

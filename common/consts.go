@@ -7,6 +7,6 @@ const (
 	ScreenHeight  = 320
 	ScreenPadding = 10
 
-	MaxChars   = 40
+	MaxChars   = 32
 	MaxClients = 8
 )
