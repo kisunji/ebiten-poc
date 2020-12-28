@@ -58,8 +58,8 @@ func (s *StartMenu) Update() {
 			s.startText = "> START"
 			s.startPressed = true
 		} else if s.startPressed {
-			// err := s.client.DialTLS("ws.chriskim.dev:3000")
-			err := s.client.Dial("localhost:8080")
+			err := s.client.DialTLS("ws.chriskim.dev:3000")
+			//err := s.client.Dial("localhost:8080")
 			if err != nil {
 				s.next = SceneNotConnected
 				return
