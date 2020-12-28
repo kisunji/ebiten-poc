@@ -59,7 +59,7 @@ func (s *StartMenu) Update() {
 			s.startPressed = true
 		} else if s.startPressed {
 			err := s.client.DialTLS("ws.chriskim.dev:3000")
-			//err := s.client.Dial("localhost:8080")
+			// err := s.client.Dial("localhost:8080")
 			if err != nil {
 				s.next = SceneNotConnected
 				return
@@ -176,7 +176,6 @@ outer:
 				log.Println(buf.ConnectError.Message)
 				l.next = SceneNotConnected
 			case *pb.ServerMessage_UpdateLobby:
-				log.Println("updated slots")
 				l.Players = buf.UpdateLobby.ConnectedSlots
 				l.hostId = buf.UpdateLobby.HostSlot
 			case *pb.ServerMessage_GameStart:
@@ -204,10 +203,12 @@ func (l *Lobby) Draw(screen *ebiten.Image) {
 	for i, p := range l.Players {
 		var s string
 		if p {
+			s = fmt.Sprintf("Player %d", i+1)
+			if l.yourId == int32(i) {
+				s = fmt.Sprintf("%s (you)", s)
+			}
 			if l.hostId == int32(i) {
-				s = fmt.Sprintf("Player %d (host)", i+1)
-			} else {
-				s = fmt.Sprintf("Player %d", i+1)
+				s = fmt.Sprintf("%s (host)", s)
 			}
 		} else {
 			s = "Not connected"
