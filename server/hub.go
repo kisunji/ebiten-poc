@@ -208,7 +208,6 @@ func (h *Hub) Run() {
 			}
 			h.sendToAll(resp)
 		case data := <-h.broadcast:
-			log.Println("got data!")
 			for c := range h.clients {
 				c.Send <- data
 			}

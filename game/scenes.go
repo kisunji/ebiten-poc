@@ -58,8 +58,8 @@ func (s *StartMenu) Update() {
 			s.startText = "> START"
 			s.startPressed = true
 		} else if s.startPressed {
-			err := s.client.DialTLS("ws.chriskim.dev:3000")
-			// err := s.client.Dial("localhost:8080")
+			// err := s.client.DialTLS("ws.chriskim.dev:3000")
+			err := s.client.Dial("localhost:8080")
 			if err != nil {
 				s.next = SceneNotConnected
 				return
@@ -205,9 +205,9 @@ func (l *Lobby) Draw(screen *ebiten.Image) {
 		var s string
 		if p {
 			if l.hostId == int32(i) {
-				s = fmt.Sprintf("Player %d (host)", i)
+				s = fmt.Sprintf("Player %d (host)", i+1)
 			} else {
-				s = fmt.Sprintf("Player %d", i)
+				s = fmt.Sprintf("Player %d", i+1)
 			}
 		} else {
 			s = "Not connected"
@@ -229,10 +229,12 @@ type MainGame struct {
 	count       int
 	Speed       int
 	Chars       common.Chars
+	Coins       []*common.Coin
 	next        Scene
 	Op          *ebiten.DrawImageOptions
 	lastUpdated time.Time
 	debouncer   *Debouncer
+	EndMessage  string
 }
 
 func NewMainGame(c *Client, d *Debouncer) *MainGame {
@@ -273,7 +275,28 @@ outer:
 				for _, ue := range buf.UpdateEntities.UpdateEntity {
 					mg.Chars.UpdateFromData(ue)
 				}
+			case *pb.ServerMessage_NewCoin:
+				coin := &common.Coin{
+					Px:          buf.NewCoin.Px,
+					Py:          buf.NewCoin.Py,
+					FrameOffset: int(buf.NewCoin.FrameOffset),
+				}
+				mg.Coins = append(mg.Coins, coin)
+			case *pb.ServerMessage_CoinGot:
+				mg.Coins[buf.CoinGot.Index].PickedUp = true
 			case *pb.ServerMessage_GameStart:
+			case *pb.ServerMessage_GameEnd:
+				var sb strings.Builder
+				sb.WriteString("GAME OVER\n")
+				for i, score := range buf.GameEnd.Score {
+					if score > 0 {
+						sb.WriteString(fmt.Sprintf("Player %d: %d\n", i+1, score))
+						if i == int(buf.GameEnd.Survivor) {
+							sb.WriteString(fmt.Sprintf("Player %d: %d (survivor)\n", i+1, score))
+						}
+					}
+				}
+				mg.EndMessage = sb.String()
 			case *pb.ServerMessage_PlayerDisconnected:
 				// maybe kill animation?
 				mg.Chars[buf.PlayerDisconnected.Id] = nil
@@ -323,7 +346,7 @@ func (mg *MainGame) parseInput() {
 	if mg.input.RightPressed != pi.RightPressed ||
 		mg.input.LeftPressed != pi.LeftPressed ||
 		mg.input.UpPressed != pi.UpPressed ||
-		mg.input.DownPressed != pi.DownPressed  ||
+		mg.input.DownPressed != pi.DownPressed ||
 		mg.input.ActionPressed != pi.ActionPressed {
 		inputChanged = true
 	}
@@ -347,6 +370,19 @@ func (mg *MainGame) parseInput() {
 }
 
 func (mg *MainGame) Draw(screen *ebiten.Image) {
+	for _, coin := range mg.Coins {
+		if coin.PickedUp {
+			continue
+		}
+		img := coinFrame(mg.count/15 + coin.FrameOffset)
+		w, h := img.Size()
+		mg.Op.GeoM.Reset()
+		mg.Op.GeoM.Translate(
+			coin.Px-float64(w)/2,
+			coin.Py-float64(h)/2,
+		)
+		screen.DrawImage(img, mg.Op)
+	}
 	tmp := make([]*common.Char, len(mg.Chars))
 	copy(tmp, mg.Chars)
 	sort.Slice(tmp, func(i, j int) bool {
@@ -430,6 +466,9 @@ func (mg *MainGame) Draw(screen *ebiten.Image) {
 			char.Py-float64(h)/2,
 		)
 		screen.DrawImage(sprite, mg.Op)
+	}
+	if mg.EndMessage != "" {
+		text.Draw(screen, mg.EndMessage, smallFont, 0, common.ScreenHeight/2, color.White)
 	}
 }
 

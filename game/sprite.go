@@ -206,3 +206,20 @@ func deadFrame() *ebiten.Image {
 		image.Rect(sx, sy, sx+frameWidth, sy+frameHeight),
 	).(*ebiten.Image)
 }
+
+func coinFrame(clock int) *ebiten.Image {
+	const (
+		frameNum    = 3
+		frameWidth  = 7
+		frameHeight = 12
+		frameOX     = 0
+		frameOY     = 475
+	)
+	i := clock % frameNum
+	sx := frameOX + i*frameWidth
+	sy := frameOY
+
+	return runnerImage.SubImage(
+		image.Rect(sx, sy, sx+frameWidth, sy+frameHeight),
+	).(*ebiten.Image)
+}

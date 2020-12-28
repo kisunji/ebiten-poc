@@ -32,6 +32,9 @@ message ServerMessage {
     PlayerDisconnected playerDisconnected = 6;
     NewHost newHost = 7;
     UpdateEntities updateEntities = 8;
+    NewCoin newCoin = 9;
+    CoinGot coinGot = 10;
+    GameEnd gameEnd = 11;
   }
 }
 
@@ -74,4 +77,20 @@ message UpdateEntity {
 
 message UpdateEntities {
   repeated UpdateEntity updateEntity = 1;
+}
+
+message NewCoin {
+  int32 index = 1;
+  double Px = 2;
+  double Py = 3;
+  int32 FrameOffset = 4;
+}
+
+message CoinGot {
+  int32 index = 1;
+}
+
+message GameEnd {
+  int32 survivor = 1;
+  repeated int32 score = 2;
 }
