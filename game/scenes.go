@@ -291,9 +291,10 @@ outer:
 				sb.WriteString("GAME OVER\n")
 				for i, score := range buf.GameEnd.Score {
 					if score > 0 {
-						sb.WriteString(fmt.Sprintf("Player %d: %d\n", i+1, score))
 						if i == int(buf.GameEnd.Survivor) {
 							sb.WriteString(fmt.Sprintf("Player %d: %d (survivor)\n", i+1, score))
+						} else {
+							sb.WriteString(fmt.Sprintf("Player %d: %d\n", i+1, score))
 						}
 					}
 				}
