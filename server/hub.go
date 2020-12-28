@@ -176,6 +176,15 @@ func (h *Hub) Run() {
 						UpdateEntities: updateAll,
 					},
 				})
+				ts := &pb.ServerMessage{
+					Content: &pb.ServerMessage_TimeSync{
+						TimeSync: &pb.TimeSync{
+							StartTime: h.world.startTime.Unix(),
+							Duration:  int32(h.world.duration.Minutes()),
+						},
+					},
+				}
+				h.sendToAll(ts)
 			default:
 				h.disconnect(clientMsg.client)
 			}
@@ -207,9 +216,11 @@ func (h *Hub) Run() {
 				},
 			}
 			h.sendToAll(resp)
-		case data := <-h.broadcast:
-			for c := range h.clients {
-				c.Send <- data
+		case data, ok := <-h.broadcast:
+			if ok {
+				for c := range h.clients {
+					c.Send <- data
+				}
 			}
 		}
 	}

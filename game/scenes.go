@@ -59,7 +59,7 @@ func (s *StartMenu) Update() {
 			s.startPressed = true
 		} else if s.startPressed {
 			err := s.client.DialTLS("ws.chriskim.dev:3000")
-			// err := s.client.Dial("localhost:8080")
+			//err := s.client.Dial("localhost:8080")
 			if err != nil {
 				s.next = SceneNotConnected
 				return
@@ -184,6 +184,8 @@ outer:
 				l.Players[buf.PlayerDisconnected.Id] = false
 			case *pb.ServerMessage_NewHost:
 				l.hostId = buf.NewHost.Id
+			case *pb.ServerMessage_UpdateEntity:
+				// just suppress
 			default:
 				log.Printf("Unknown message type %T\n", buf)
 			}
@@ -231,6 +233,8 @@ type MainGame struct {
 	Speed       int
 	Chars       common.Chars
 	Coins       []*common.Coin
+	StartTime   int64 // unixtime
+	Duration    time.Duration
 	next        Scene
 	Op          *ebiten.DrawImageOptions
 	lastUpdated time.Time
@@ -269,31 +273,37 @@ outer:
 			if err != nil {
 				log.Fatalln(err)
 			}
-			switch buf := msg.Content.(type) {
+			switch content := msg.Content.(type) {
 			case *pb.ServerMessage_UpdateEntity:
-				mg.Chars.UpdateFromData(buf.UpdateEntity)
+				mg.Chars.UpdateFromData(content.UpdateEntity)
 			case *pb.ServerMessage_UpdateEntities:
-				for _, ue := range buf.UpdateEntities.UpdateEntity {
+				for _, ue := range content.UpdateEntities.UpdateEntity {
 					mg.Chars.UpdateFromData(ue)
 				}
 			case *pb.ServerMessage_NewCoin:
 				coin := &common.Coin{
-					Px:          buf.NewCoin.Px,
-					Py:          buf.NewCoin.Py,
-					FrameOffset: int(buf.NewCoin.FrameOffset),
+					Px:          content.NewCoin.Px,
+					Py:          content.NewCoin.Py,
+					FrameOffset: int(content.NewCoin.FrameOffset),
 				}
 				mg.Coins = append(mg.Coins, coin)
 			case *pb.ServerMessage_CoinGot:
-				mg.Coins[buf.CoinGot.Index].PickedUp = true
-			case *pb.ServerMessage_GameStart:
+				// todo: sometimes server sends messages from last game
+				if int(content.CoinGot.Index) > len(mg.Coins) {
+					continue
+				}
+				mg.Coins[content.CoinGot.Index].PickedUp = true
+			case *pb.ServerMessage_TimeSync:
+				mg.StartTime = content.TimeSync.StartTime
+				mg.Duration = time.Duration(content.TimeSync.Duration) * time.Minute
 			case *pb.ServerMessage_GameEnd:
 				var sb strings.Builder
 				sb.WriteString("GAME OVER\n")
-				for i, score := range buf.GameEnd.Score {
-					if score > 0 {
-						if i == int(buf.GameEnd.Survivor) {
-							sb.WriteString(fmt.Sprintf("Player %d: %d (survivor)\n", i+1, score))
-						} else {
+				if content.GameEnd.Survivor != 0 {
+					sb.WriteString(fmt.Sprintf("Player %d wins!\n", content.GameEnd.Survivor+1))
+				} else {
+					for i, score := range content.GameEnd.Score {
+						if score > 0 {
 							sb.WriteString(fmt.Sprintf("Player %d: %d\n", i+1, score))
 						}
 					}
@@ -301,9 +311,9 @@ outer:
 				mg.EndMessage = sb.String()
 			case *pb.ServerMessage_PlayerDisconnected:
 				// maybe kill animation?
-				mg.Chars[buf.PlayerDisconnected.Id] = nil
+				mg.Chars[content.PlayerDisconnected.Id] = nil
 			default:
-				log.Printf("Unknown message type %T\n", buf)
+				log.Printf("Unknown message type %T\n", content)
 			}
 		case <-mg.Client.Disconnect:
 			log.Println("lost connection to server")
@@ -459,7 +469,6 @@ func (mg *MainGame) Draw(screen *ebiten.Image) {
 				}
 			}
 		}
-
 		w, h := sprite.Size()
 		mg.Op.GeoM.Reset()
 		if char.Fx < 0 {
@@ -471,6 +480,15 @@ func (mg *MainGame) Draw(screen *ebiten.Image) {
 			char.Py-float64(h)/2,
 		)
 		screen.DrawImage(sprite, mg.Op)
+	}
+	if mg.StartTime > 0 && mg.Duration > 0 && mg.EndMessage == "" {
+		elapsed := time.Since(time.Unix(mg.StartTime, 0))
+		remaining := mg.Duration - elapsed
+
+		minutes := int(remaining.Seconds() / 60)
+		seconds := int(remaining.Seconds()) % 60
+
+		text.Draw(screen, fmt.Sprintf("%d:%02d", minutes, seconds), smallFont, common.ScreenWidth/2-24, 24, color.White)
 	}
 	if mg.EndMessage != "" {
 		text.Draw(screen, mg.EndMessage, smallFont, 0, common.ScreenHeight/2, color.White)

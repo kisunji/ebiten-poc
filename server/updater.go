@@ -25,6 +25,7 @@ func NewWorld(broadcast chan []byte) *World {
 		AIs:         make([]*AI, 0),
 		broadcast:   broadcast,
 		killSig:     make(chan struct{}),
+		duration:    3 * time.Minute,
 	}
 }
 
@@ -39,6 +40,8 @@ type World struct {
 	AIs         []*AI
 	broadcast   chan []byte
 	killSig     chan struct{}
+	startTime   time.Time
+	duration    time.Duration
 }
 
 func (w *World) Setup(aiChan chan AIData) {
@@ -69,6 +72,9 @@ func (w *World) makeCoins() {
 	for {
 		select {
 		case <-timer.C:
+			if !w.Running {
+				continue
+			}
 			coin := common.NewCoin()
 			w.Coins = append(w.Coins, coin)
 			msg := &pb.ServerMessage{
@@ -95,6 +101,7 @@ func (w *World) makeCoins() {
 
 // Run should be called in a goroutine
 func (w *World) Run() {
+	w.startTime = time.Now()
 	w.Running = true
 	previous := time.Now()
 	var lag time.Duration
@@ -204,6 +211,20 @@ func (w *World) update() {
 			Content: &pb.ServerMessage_GameEnd{
 				GameEnd: &pb.GameEnd{
 					Survivor: int32(alive[0]),
+				},
+			},
+		}
+		bytes, err := proto.Marshal(ge)
+		if err != nil {
+			log.Fatalln("client connect: marshaling error: ", err)
+		}
+		w.broadcast <- bytes
+		w.Running = false
+	}
+	if time.Since(w.startTime) > w.duration {
+		ge := &pb.ServerMessage{
+			Content: &pb.ServerMessage_GameEnd{
+				GameEnd: &pb.GameEnd{
 					Score:    w.Score,
 				},
 			},
