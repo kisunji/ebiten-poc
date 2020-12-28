@@ -314,6 +314,9 @@ outer:
 			break outer
 		}
 	}
+	if mg.EndMessage != "" {
+		return
+	}
 	mg.parseInput()
 	for _, char := range mg.Chars {
 		if char == nil {

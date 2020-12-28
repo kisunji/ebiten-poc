@@ -213,6 +213,7 @@ func (w *World) update() {
 			log.Fatalln("client connect: marshaling error: ", err)
 		}
 		w.broadcast <- bytes
+		w.Running = false
 	}
 }
 
